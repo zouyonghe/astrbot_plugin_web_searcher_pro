@@ -14,6 +14,7 @@ from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchRes
 
 logger = logging.getLogger("astrbot")
 
+image_llm_prefix = "The images have been sent to the user. Below is the description of the images:\n"
 
 def is_valid_url(url: str):
     try:
@@ -147,10 +148,13 @@ class WebSearcherPro(Star):
         results = await self.search(query, categories="images", limit=5)
         if not results:
             return "No images found for your query."
+        chain = []
         for result in results.results:
             #event.image_result(result.img_src)
-            event.make_result().url_image(result.img_src)
-        image_llm_prefix = "The images have been sent to the user. Below is the description of the images:\n"
+            logger.error(result.img_src)
+            #event.make_result().url_image(result.img_src)
+            chain.append(Image.fromURL(result.img_src))
+        event.chain_result(chain)
         return f"{image_llm_prefix} {results}"
 
     @llm_tool("web_search_videos")
