@@ -114,7 +114,7 @@ class WebSearcherPro(Star):
             yield event.plain_result("操作参数错误，应为 on 或 off")
 
     @llm_tool("web_search")
-    async def search_general(self, query: str) -> str:
+    async def search_general(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for general information
 
         Args:
@@ -144,7 +144,7 @@ class WebSearcherPro(Star):
         return str(results)
 
     @llm_tool("web_search_videos")
-    async def search_videos(self, query: str) -> str:
+    async def search_videos(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for videos
 
         Args:
@@ -170,7 +170,7 @@ class WebSearcherPro(Star):
         return str(results)
 
     @llm_tool("web_search_science")
-    async def search_science(self, query: str) -> str:
+    async def search_science(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for scientific information
 
         Args:
@@ -183,7 +183,7 @@ class WebSearcherPro(Star):
         return str(results)
 
     @llm_tool("web_search_music")
-    async def search_music(self, query: str) -> str:
+    async def search_music(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for music-related information
 
         Args:
@@ -196,7 +196,7 @@ class WebSearcherPro(Star):
         return str(results)
 
     @llm_tool("web_search_technical")
-    async def search_technical(self, query: str) -> str:
+    async def search_technical(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for technical information
 
         Args:
@@ -209,7 +209,7 @@ class WebSearcherPro(Star):
         return str(results)
 
     @llm_tool("web_search_academic")
-    async def search_academic(self, query: str) -> str:
+    async def search_academic(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for academic information
 
         Args:
@@ -224,7 +224,7 @@ class WebSearcherPro(Star):
 
 
     @llm_tool("fetch_url")
-    async def fetch_website_content(self, url: str) -> str:
+    async def fetch_website_content(self, event: AstrMessageEvent, url: str) -> str:
         """Fetch the content of a website using the provided URL.
 
         Args:
