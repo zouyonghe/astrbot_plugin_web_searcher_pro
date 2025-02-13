@@ -138,15 +138,14 @@ class WebSearcherPro(Star):
         return str(results)
 
     @llm_tool("web_search_images")
-    async def search_images(self, event: AstrMessageEvent, query: str, limit: int = 5) -> str:
+    async def search_images(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for images
 
         Args:
             query (string): A search query used to fetch image-based snippets or content.
-            limit (int): The number of images to retrieve. Defaults to 5.
         """
         logger.info(f"Starting image search for: {query}")
-        results = await self.search(query, categories="images", limit=limit)
+        results = await self.search(query, categories="images", limit=5)
         if not results:
             return "No images found for your query."
         image_chain = []
