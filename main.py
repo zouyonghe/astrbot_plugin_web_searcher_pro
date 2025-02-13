@@ -8,7 +8,8 @@ from astrbot.api import *
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.core.message.components import Image
-from search_models import SearchResult, SearchResultItem
+
+from . import search_models
 
 logger = logging.getLogger("astrbot")
 
@@ -19,7 +20,7 @@ class WebSearcherPro(Star):
         super().__init__(context)
         self.config = config
 
-    async def search(self, query: str, categories: str = "general", limit: int = 10) -> Optional[SearchResult]:
+    async def search(self, query: str, categories: str = "general", limit: int = 10) -> Optional[search_models.SearchResult]:
         """Perform a search query for a specific category.
     
         Args:
@@ -49,9 +50,9 @@ class WebSearcherPro(Star):
                         if not data.get("results"):
                             return None
                         
-                        results = SearchResult(
+                        results = search_models.SearchResult(
                             results=[
-                                SearchResultItem(
+                                search_models.SearchResultItem(
                                     title=item.get('title', ''),
                                     url=item.get('url', ''),
                                     img_src=item.get('img_src', ''),
