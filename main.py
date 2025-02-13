@@ -23,7 +23,6 @@ def is_valid_url(url: str):
     except Exception:
         return False
 
-
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.0",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
 class WebSearcherPro(Star):
@@ -60,7 +59,6 @@ class WebSearcherPro(Star):
                         
                         if not data.get("results"):
                             return None
-
 
                         results = SearchResult(
                             results=[
