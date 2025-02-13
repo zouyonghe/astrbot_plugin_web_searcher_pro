@@ -148,8 +148,10 @@ class WebSearcherPro(Star):
         if not results:
             return "No images found for your query."
         for result in results.results:
-            event.image_result(result.img_src)
-        return str(results)
+            #event.image_result(result.img_src)
+            event.make_result().url_image(result.img_src)
+        image_llm_prefix = "The images have been sent to the user. Below is the description of the images:\n"
+        return f"{image_llm_prefix} {results}"
 
     @llm_tool("web_search_videos")
     async def search_videos(self, event: AstrMessageEvent, query: str) -> str:
