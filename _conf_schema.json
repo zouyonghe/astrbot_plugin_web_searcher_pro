@@ -1,0 +1,8 @@
+{
+    "searxng_api_url": {
+        "type": "string",
+        "description": "SearXNG API地址",
+        "default": "http://127.0.0.1:8080",
+        "hint": "需要包含http://或https://前缀"
+    }
+}
