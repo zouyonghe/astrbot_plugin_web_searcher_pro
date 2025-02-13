@@ -147,10 +147,8 @@ class WebSearcherPro(Star):
         results = await self.search(query, categories="images", limit=5)
         if not results:
             return "No images found for your query."
-        image_chain = []
         for result in results.results:
-            image_chain.append(Image.fromURL(result.img_src))
-        event.chain_result(image_chain)
+            event.image_result(result.img_src)
         return str(results)
 
     @llm_tool("web_search_videos")
