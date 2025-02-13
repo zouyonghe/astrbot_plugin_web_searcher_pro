@@ -1,5 +1,6 @@
 import logging
 from typing import Optional
+from urllib.parse import urlparse
 
 import aiohttp
 from readability import Document
@@ -9,9 +10,19 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.core.message.components import Image
 
-from data.plugins.astrbot_plugin_web_searcher_pro import search_models
+from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
 
 logger = logging.getLogger("astrbot")
+
+
+def is_valid_url(url: str):
+    try:
+        result = urlparse(url)
+        # 检查网络协议是否为 http 或 https 且包含域名
+        return all([result.scheme in ("http", "https"), result.netloc])
+    except Exception:
+        return False
+
 
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.0",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
@@ -20,7 +31,7 @@ class WebSearcherPro(Star):
         super().__init__(context)
         self.config = config
 
-    async def search(self, query: str, categories: str = "general", limit: int = 10) -> Optional[search_models.SearchResult]:
+    async def search(self, query: str, categories: str = "general", limit: int = 10) -> Optional[SearchResult]:
         """Perform a search query for a specific category.
     
         Args:
@@ -50,12 +61,12 @@ class WebSearcherPro(Star):
                         if not data.get("results"):
                             return None
                         
-                        results = search_models.SearchResult(
+                        results = SearchResult(
                             results=[
-                                search_models.SearchResultItem(
+                                SearchResultItem(
                                     title=item.get('title', ''),
-                                    url=item.get('url', ''),
-                                    img_src=item.get('img_src', ''),
+                                    url=item.get('url', '') if is_valid_url(item.get('url', '')) else '',
+                                    img_src=item.get('img_src', '') if is_valid_url(item.get('img_src', '')) else '',
                                     content=item.get('content', ''),
                                     engine=item.get('engine', ''),
                                     score=item.get('score', 0.0)
@@ -139,6 +150,7 @@ class WebSearcherPro(Star):
             return "No images found for your query."
         image_chain = []
         for result in results.results:
+            logger.error(f"URL: {result.img_src}")
             image_chain.append(Image.fromURL(result.img_src))
         event.chain_result(image_chain)
         return str(results)
