@@ -60,7 +60,8 @@ class WebSearcherPro(Star):
                         
                         if not data.get("results"):
                             return None
-                        
+
+
                         results = SearchResult(
                             results=[
                                 SearchResultItem(
@@ -150,7 +151,6 @@ class WebSearcherPro(Star):
             return "No images found for your query."
         image_chain = []
         for result in results.results:
-            logger.error(f"URL: {result.img_src}")
             image_chain.append(Image.fromURL(result.img_src))
         event.chain_result(image_chain)
         return str(results)
