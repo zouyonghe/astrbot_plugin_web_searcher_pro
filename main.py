@@ -9,7 +9,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.core.message.components import Image
 
-from . import search_models
+from data.plugins.astrbot_plugin_web_searcher_pro import search_models
 
 logger = logging.getLogger("astrbot")
 
