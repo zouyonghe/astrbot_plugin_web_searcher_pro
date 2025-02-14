@@ -18,52 +18,6 @@ logger = logging.getLogger("astrbot")
 
 image_llm_prefix = "The images have been sent to the user. Below is the description of the images:\n"
 
-# def is_valid_url(url: str):
-#     try:
-#         result = urlparse(url)
-#         # 检查网络协议是否为 http 或 https 且包含域名
-#         return all([result.scheme in ("http", "https"), result.netloc])
-#     except Exception:
-#         return False
-
-def is_valid_url(url):
-    """简单验证是否符合 URL 格式"""
-    url_pattern = re.compile(
-        r'^(https?://)?'  # 支持 http 和 https
-        r'([a-zA-Z0-9.-]+)'  # 域名部分
-        r'(\.[a-zA-Z]{2,3})'  # 顶级域名 .com/.cn 等
-        r'(:\d+)?'  # 可选端口号
-        r'(/[-a-zA-Z0-9@:%._+~#=]*)*'  # URL 路径部分
-        r'(\?[;&a-zA-Z0-9%._+~#=-]*)?'  # 可选查询参数
-        r'(#[a-zA-Z0-9]*)?$'  # 可选锚点
-    )
-    return url_pattern.match(url) is not None
-
-
-async def validate_image_url(img_url):
-    if not img_url:
-        return None
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.head(img_url, timeout=2) as response:
-                if response.status == 200 and "image" in response.headers.get("Content-Type", "").lower():
-                    return img_url
-    except Exception:
-        pass
-    return None
-
-
-async def filter_valid_image_urls_async(original_result):
-    img_urls = [item.img_src for item in original_result.results if item.img_src]
-    tasks = [validate_image_url(url) for url in img_urls]
-
-    results = await asyncio.gather(*tasks)  # 并行处理请求
-    valid_results = [item for item in original_result.results if item.img_src in results]
-
-    original_result.results = valid_results
-    return original_result
-
-
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.0",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
 class WebSearcherPro(Star):
@@ -222,12 +176,21 @@ class WebSearcherPro(Star):
             query (string): A search query used to fetch image-based results.
         """
         logger.info(f"Starting image search for: {query}")
-        results = await self.search(query, categories="images", limit=10)
+        results = await self.search(query, categories="images", limit=20)
         if not results:
             return
-        selected_image = random.choice(results.results)
-        results.results = [selected_image]
-        yield event.image_result(selected_image.img_src)
+        # 验证所有图片链接的有效性，并筛选出有效图片
+        valid_results = await filter_valid_image_urls_async(results)
+
+        # 如果没有任何有效图片，直接返回失败消息
+        if not valid_results:
+            logger.warning(f"No valid images found for query: {query}")
+            yield event.plain_result("❌ 未找到有效的图片，请换个关键词试试。")
+            return
+
+        # 从有效图片中随机选择一张
+        selected_image = random.choice(valid_results)
+        results.results = [selected_image]  # 更新仅包含随机选取的图片
 
         try:
             async for result in self._generate_response(event, query, results):
@@ -336,3 +299,38 @@ class WebSearcherPro(Star):
         except Exception as e:
             logger.error(f"fetch_website_content 出现问题: {e}")
             return "Fetch URL failed, please try again later."
+
+
+def is_valid_url(url):
+    """简单验证是否符合 URL 格式"""
+    url_pattern = re.compile(
+        r'^(https?://)?'  # 支持 http 和 https
+        r'([a-zA-Z0-9.-]+)'  # 域名部分
+        r'(\.[a-zA-Z]{2,3})'  # 顶级域名 .com/.cn 等
+        r'(:\d+)?'  # 可选端口号
+        r'(/[-a-zA-Z0-9@:%._+~#=]*)*'  # URL 路径部分
+        r'(\?[;&a-zA-Z0-9%._+~#=-]*)?'  # 可选查询参数
+        r'(#[a-zA-Z0-9]*)?$'  # 可选锚点
+    )
+    return url_pattern.match(url) is not None
+
+
+async def is_validate_image_url(img_url) -> bool:
+    if not img_url:
+        return False
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.head(img_url, timeout=2) as response:
+                if response.status == 200 and "image" in response.headers.get("Content-Type", "").lower():
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+async def filter_valid_image_urls_async(result: SearchResult) -> SearchResult:
+    img_urls = [item.img_src for item in result.results if item.img_src]
+    tasks = [is_validate_image_url(url) for url in img_urls]
+    results = await asyncio.gather(*tasks)  # 并行处理请求
+    result.results = [item for item in result.results if item.img_src in results]
+    return result

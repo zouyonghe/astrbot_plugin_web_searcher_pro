@@ -17,6 +17,10 @@ class SearchResultItem:
 class SearchResult:
     results: List[SearchResultItem] = field(default_factory=list)
 
+    def __iter__(self):
+        """使 SearchResult 类支持迭代"""
+        return iter(self.results)
+
     def __str__(self) -> str:
         """提供结果的字符串形式"""
         formatted_results = [
