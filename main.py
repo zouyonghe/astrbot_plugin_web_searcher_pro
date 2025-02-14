@@ -384,5 +384,4 @@ async def filter_and_select_results_async(result: SearchResult, categories: str)
         result.results = [random.choice(result.results)]
     elif categories == "videos":
         result.results = result.results[:1]
-    logger.error(f"{result}")
     return result
