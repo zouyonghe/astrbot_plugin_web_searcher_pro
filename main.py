@@ -75,6 +75,7 @@ class WebSearcherPro(Star):
                             ]
                         )
                         if categories == "images":
+                            result.results = result.results[:50]
                             result = await filter_and_select_results_async(result, categories)
 
                         result.results = result.results[:limit]
@@ -380,7 +381,7 @@ async def filter_and_select_results_async(result: SearchResult, categories: str)
     ]
 
     if categories == "images":
-        result.results = random.choice(result.results[:20])
+        result.results = [random.choice(result.results)]
     elif categories == "videos":
         result.results = result.results[:1]
     logger.error(f"{result}")
