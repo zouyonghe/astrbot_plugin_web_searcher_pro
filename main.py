@@ -179,17 +179,17 @@ class WebSearcherPro(Star):
         results = await self.search(query, categories="images", limit=20)
         if not results:
             return
-        # 验证所有图片链接的有效性，并筛选出有效图片
-        valid_results = await filter_valid_image_urls_async(results)
-
-        # 如果没有任何有效图片，直接返回失败消息
-        if not valid_results:
-            logger.warning(f"No valid images found for query: {query}")
-            yield event.plain_result("❌ 未找到有效的图片，请换个关键词试试。")
-            return
-
-        # 从有效图片中随机选择一张
-        selected_image = random.choice(valid_results.results)
+        # # 验证所有图片链接的有效性，并筛选出有效图片
+        # valid_results = await filter_valid_image_urls_async(results)
+        #
+        # # 如果没有任何有效图片，直接返回失败消息
+        # if not valid_results:
+        #     logger.warning(f"No valid images found for query: {query}")
+        #     yield event.plain_result("❌ 未找到有效的图片，请换个关键词试试。")
+        #     return
+        #
+        # # 从有效图片中随机选择一张
+        selected_image = random.choice(results.results)
         results.results = [selected_image]  # 更新仅包含随机选取的图片
 
         try:
