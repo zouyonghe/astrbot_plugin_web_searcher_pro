@@ -2,7 +2,6 @@ import logging
 import os
 import uuid
 from typing import Optional
-from urllib.parse import urlparse
 
 import aiohttp
 from readability import Document
@@ -10,8 +9,6 @@ from readability import Document
 from astrbot.api import *
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
-from astrbot.core.message.components import Image
-
 from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
 
 logger = logging.getLogger("astrbot")
@@ -28,29 +25,37 @@ image_llm_prefix = "The images have been sent to the user. Below is the descript
 
 async def is_valid_url(url):
     """验证 URL 是否有效"""
+    proxy = os.environ.get("https_proxy")  # 从环境变量获取代理
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.head(url) as response:
+        async with aiohttp.ClientSession(connector=TCPConnector(ssl=False)) as session:
+            async with session.head(url, proxy=proxy) as response:
                 return response.status == 200
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Failed to access URL: {url}, error: {e}")
         return False
 
 
-
 async def download_image_from_url(url):
-    """下载图片并保存到本地"""
+    """下载图片并保存到本地，通过 https_proxy 配置"""
     temp_dir = "/app/.config/QQ/NapCat/temp"
     temp_file = os.path.join(temp_dir, f"{uuid.uuid4()}.jpg")  # 保存为 jpg 格式
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            if response.status == 200:
-                with open(temp_file, "wb") as f:
-                    f.write(await response.read())
-                    return temp_file
-            else:
-                logger.warning(f"Failed to download image: {url}")
-                return None
 
+    # 从环境变量获取代理
+    proxy = os.environ.get("https_proxy")
+
+    try:
+        async with aiohttp.ClientSession(connector=TCPConnector(ssl=False)) as session:
+            async with session.get(url, proxy=proxy) as response:
+                if response.status == 200:
+                    with open(temp_file, "wb") as f:
+                        f.write(await response.read())
+                        return temp_file
+                else:
+                    logger.warning(f"Failed to download image: {url}, HTTP status: {response.status}")
+                    return None
+    except Exception as e:
+        logger.warning(f"Error while downloading image: {url}, error: {e}")
+        return None
 
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.0",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
@@ -58,6 +63,7 @@ class WebSearcherPro(Star):
     def __init__(self, context: Context, config: dict):
         super().__init__(context)
         self.config = config
+        self.proxy = os.environ.get("https_proxy")
 
     async def search(self, query: str, categories: str = "general", limit: int = 10) -> Optional[SearchResult]:
         """Perform a search query for a specific category.
