@@ -151,6 +151,7 @@ class WebSearcherPro(Star):
             #return "No images found for your query."
         chain = []
         for result in results.results:
+            yield event.plain_result(f"{results}")
             #event.image_result(result.img_src)
             logger.error(result.img_src)
             #event.make_result().url_image(result.img_src)
