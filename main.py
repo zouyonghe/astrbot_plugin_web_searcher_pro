@@ -1,10 +1,10 @@
+import json
 import logging
 import os
-import uuid
+import re
 from typing import Optional
 
 import aiohttp
-from aiohttp import TCPConnector
 from readability import Document
 
 from astrbot.api import *
@@ -24,39 +24,19 @@ image_llm_prefix = "The images have been sent to the user. Below is the descript
 #     except Exception:
 #         return False
 
-async def is_valid_url(url):
-    """验证 URL 是否有效"""
-    proxy = os.environ.get("https_proxy")  # 从环境变量获取代理
-    try:
-        async with aiohttp.ClientSession(connector=TCPConnector(ssl=False)) as session:
-            async with session.head(url, proxy=proxy) as response:
-                return response.status == 200
-    except Exception as e:
-        logger.warning(f"Failed to access URL: {url}, error: {e}")
-        return False
+def is_valid_url(url):
+    """简单验证是否符合 URL 格式"""
+    url_pattern = re.compile(
+        r'^(https?://)?'  # 支持 http 和 https
+        r'([a-zA-Z0-9.-]+)'  # 域名部分
+        r'(\.[a-zA-Z]{2,3})'  # 顶级域名 .com/.cn 等
+        r'(:\d+)?'  # 可选端口号
+        r'(/[-a-zA-Z0-9@:%._+~#=]*)*'  # URL 路径部分
+        r'(\?[;&a-zA-Z0-9%._+~#=-]*)?'  # 可选查询参数
+        r'(#[a-zA-Z0-9]*)?$'  # 可选锚点
+    )
+    return url_pattern.match(url) is not None
 
-
-async def download_image_from_url(url):
-    """下载图片并保存到本地，通过 https_proxy 配置"""
-    temp_dir = "/app/.config/QQ/NapCat/temp"
-    temp_file = os.path.join(temp_dir, f"{uuid.uuid4()}.jpg")  # 保存为 jpg 格式
-
-    # 从环境变量获取代理
-    proxy = os.environ.get("https_proxy")
-
-    try:
-        async with aiohttp.ClientSession(connector=TCPConnector(ssl=False)) as session:
-            async with session.get(url, proxy=proxy) as response:
-                if response.status == 200:
-                    with open(temp_file, "wb") as f:
-                        f.write(await response.read())
-                        return temp_file
-                else:
-                    logger.warning(f"Failed to download image: {url}, HTTP status: {response.status}")
-                    return None
-    except Exception as e:
-        logger.warning(f"Error while downloading image: {url}, error: {e}")
-        return None
 
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.0",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
@@ -119,6 +99,29 @@ class WebSearcherPro(Star):
             logger.error(f"JSON parsing error: {e}")
         except Exception as e:
             logger.error(f"Unexpected error during fetch_search_results: {e}")
+        
+    async def _generate_description(self, event: AstrMessageEvent, type: str, query: str, info: str):
+        provider = self.context.get_using_provider()
+        if provider:
+            description_generate_prefix = (
+                f"以下是关于用户查询的`{query}`相关信息，"
+                f"查询的{type}已经被发送给用户"
+                "请根据查询的信息基于你的角色以合适的语气、称呼等，生成符合人设的回答"
+                f"查询信息：{info}"
+            )
+
+            conversation_id = await self.context.conversation_manager.get_curr_conversation_id(event.unified_msg_origin)
+            conversation = await self.context.conversation_manager.get_conversation(event.unified_msg_origin,
+                                                                                    conversation_id)
+            yield event.request_llm(
+                prompt=description_generate_prefix,
+                func_tool_manager=self.context.get_llm_tool_manager(),
+                session_id=event.session_id,
+                contexts=json.loads(conversation.history),
+                system_prompt=self.context.provider_manager.selected_default_persona.get("prompt", ""),
+                image_urls=[],
+                conversation=conversation,
+            )
 
     @filter.command("websearch")
     async def websearch(self, event: AstrMessageEvent, operation: str = None):
@@ -182,35 +185,9 @@ class WebSearcherPro(Star):
         logger.info(f"Starting image search for: {query}")
         results = await self.search(query, categories="images", limit=5)
         if not results:
-            event.plain_result("No images found for your query.")
             return "No images found for your query."
-        from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import AiocqhttpMessageEvent
-        assert isinstance(event, AiocqhttpMessageEvent)
-        client = event.bot
         for result in results.results:
-            if not await is_valid_url(result.img_src):
-                logger.warning(f"Invalid or unreachable URL: {result.img_src}")
-                continue
-
-            image_file = await download_image_from_url(result.img_src)
-            if not image_file:
-                logger.warning(f"Skipping image due to download failure: {result.url}")
-                continue
-            if event.is_private_chat():
-                await client.send_private_msg(
-                    user_id=int(event.get_sender_id()),
-                    message=f"[CQ:image,file={image_file}]",
-                    auto_escape=False,
-                    self_id=int(event.get_self_id()),
-                )
-            else:
-                await client.send_group_msg(
-                    group_id=int(event.get_group_id()),
-                    message=f"[CQ:image,file={image_file}]",
-                    auto_escape=False,
-                    self_id=int(event.get_self_id()),
-                )
-                os.remove(image_file)
+            event.image_result(result.img_src)
         return f"{image_llm_prefix} {results}"
 
     @llm_tool("web_search_videos")
