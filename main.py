@@ -101,22 +101,29 @@ class WebSearcherPro(Star):
         except Exception as e:
             logger.error(f"Unexpected error during fetch_search_results: {e}")
         
-    async def _generate_description(self, event: AstrMessageEvent, type: str, query: str, info: str):
+    async def _generate_response(self, event: AstrMessageEvent, result_type: str, query: str, results: SearchResult):
+        for item in results.results:
+            yield event.image_result(item.img_src)
+
         provider = self.context.get_using_provider()
         if provider:
             description_generate_prefix = (
                 f"以下是关于用户查询的`{query}`相关信息，"
-                f"查询的{type}已经被发送给用户"
+                f"查询的{result_type}已经被发送给用户"
                 "请根据查询的信息基于你的角色以合适的语气、称呼等，生成符合人设的回答"
-                f"查询信息：{info}"
+                f"查询信息：{str(results)}"
             )
+            urls = []
+            for item in results.results:
+                if item.url:
+                    urls.append(item.url)
 
             conversation_id = await self.context.conversation_manager.get_curr_conversation_id(event.unified_msg_origin)
             conversation = await self.context.conversation_manager.get_conversation(event.unified_msg_origin,
                                                                                     conversation_id)
             yield event.request_llm(
                 prompt=description_generate_prefix,
-                func_tool_manager=self.context.get_llm_tool_manager(),
+                func_tool_manager=None,
                 session_id=event.session_id,
                 contexts=json.loads(conversation.history),
                 system_prompt=self.context.provider_manager.selected_default_persona.get("prompt", ""),
@@ -176,12 +183,6 @@ class WebSearcherPro(Star):
             return "No information found for your query."
         return str(results)
 
-    async def _show_images(self, event: AstrMessageEvent, results: SearchResult):
-        # for result in results.results:
-        #     logger.info(f"Sending image: {result.url}")
-        #     yield event.image_result(result.url)
-        yield event.image_result("")
-
     @llm_tool("web_search_images")
     async def search_images(self, event: AstrMessageEvent, query: str):
         """Search the web for images
@@ -192,12 +193,9 @@ class WebSearcherPro(Star):
         logger.info(f"Starting image search for: {query}")
         results = await self.search(query, categories="images", limit=5)
         if not results:
-            #return "No images found for your query."
             return
-        yield event.plain_result("test")
-        yield self._show_images(event, results)
-        yield event.plain_result("test2")
-        #return f"{image_llm_prefix} {results}"
+        async for result in self._generate_response(event, "image", query, results):
+            yield result
 
     @llm_tool("web_search_videos")
     async def search_videos(self, event: AstrMessageEvent, query: str) -> str:
