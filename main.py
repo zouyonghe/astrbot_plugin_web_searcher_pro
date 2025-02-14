@@ -73,6 +73,7 @@ class WebSearcherPro(Star):
                         if categories == "images":
                             # Validate images.
                             results = await filter_valid_image_urls_async(results)
+                            logger.error(f"valid_number: {len(results.results)}")
 
                         results.results = results.results[:limit]
                         return results
