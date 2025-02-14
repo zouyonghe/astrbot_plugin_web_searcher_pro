@@ -86,26 +86,21 @@ class WebSearcherPro(Star):
         except Exception as e:
             logger.error(f"Unexpected error during fetch_search_results: {e}")
         
-    async def _generate_response(self, event: AstrMessageEvent, query: str, results: SearchResult):
+    async def _generate_response(self, event: AstrMessageEvent, results: SearchResult):
         provider = self.context.get_using_provider()
         if provider:
             description_generate_prompt = (
-                f"你已经依据用户请求的`{event.get_message_str()}`发起了函数调用，"
-                f"以下是通过函数调用获取的`{query}`相关信息，"
-                f"如果是图片，那么随机挑选的一张图片已被发送给用户，"
+                f"你已经依据用户的请求`{event.get_message_str()}`发起了Web搜索的函数调用，"
+                f"以下是函数调用返回的结果，"
+                f"如果是图片，那么随机挑选的其中一张图片已被发送给用户，"
                 f"如果是视频，那么搜索结果中第一个视频已被发送给用户，"
-                f"请根据下述相关信息，基于你的角色以合适的语气、称呼等，生成符合人设的解说。\n\n"
+                f"请根据下述信息，基于你的角色以合适的语气、称呼等，生成符合人设的解说。\n\n"
                 f"信息：{str(results)}"
             )
-            urls = []
-            for item in results.results:
-                if item.url:
-                    urls.append(item.img_src)
 
             conversation_id = await self.context.conversation_manager.get_curr_conversation_id(event.unified_msg_origin)
             conversation = await self.context.conversation_manager.get_conversation(event.unified_msg_origin,
                                                                                     conversation_id)
-            #logger.error(str(results))
             yield event.request_llm(
                 prompt=description_generate_prompt,
                 func_tool_manager=None,
@@ -187,7 +182,7 @@ class WebSearcherPro(Star):
             logger.error("Random image selection failed.")
             return
         try:
-            async for result in self._generate_response(event, query, results):
+            async for result in self._generate_response(event, results):
                 yield result
         except Exception as e:
             logger.error(f"调用 generate_response 时出错: {e}")
