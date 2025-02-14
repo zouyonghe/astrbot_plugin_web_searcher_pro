@@ -74,9 +74,7 @@ class WebSearcherPro(Star):
                                 for item in data.get("results", [])
                             ]
                         )
-
-                        if categories == "images" or categories == "videos":
-                            # Validate url.
+                        if categories == "images":
                             result = await filter_and_select_results_async(result, categories)
 
                         result.results = result.results[:limit]
@@ -85,11 +83,11 @@ class WebSearcherPro(Star):
                         logger.error(f"Failed to search SearxNG. HTTP Status: {response.status}, Params: {params}")
                         return None
         except aiohttp.ClientError as e:
-            logger.error(f"HTTP client error during fetch_search_results: {e}")
+            logger.error(f"HTTP client error during search: {e}")
         except ValueError as e:
             logger.error(f"JSON parsing error: {e}")
         except Exception as e:
-            logger.error(f"Unexpected error during fetch_search_results: {e}")
+            logger.error(f"Unexpected error during search: {e}")
         
     async def _generate_response(self, event: AstrMessageEvent, result: SearchResult):
         provider = self.context.get_using_provider()
@@ -194,7 +192,7 @@ class WebSearcherPro(Star):
             yield event.plain_result("❌ 生成回复时失败，请查看控制台日志")
 
     @llm_tool("web_search_videos")
-    async def search_videos(self, event: AstrMessageEvent, query: str):
+    async def search_videos(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for videos
 
         Args:
@@ -203,17 +201,18 @@ class WebSearcherPro(Star):
         logger.info(f"Starting video search for: {query}")
         result = await self.search(query, categories="videos")
         if not result or not result.results:
-            return
-        selected_video = result.results[0]
-        if isinstance(selected_video, SearchResultItem):
-            is_valid, downloaded_file = await is_valid_video_url_with_download(selected_video.iframe_src, temp_path)
-            if is_valid:
-                yield event.chain_result(Video.fromFileSystem(path=downloaded_file))
-                os.remove(downloaded_file)
-                async for r in self._generate_response(event, result):
-                    yield r
-            else:
-                return
+            return "No videos found for your query."
+        # selected_video = result.results[0]
+        # if isinstance(selected_video, SearchResultItem):
+        #     is_valid, downloaded_file = await is_valid_video_url_with_download(selected_video.iframe_src, temp_path)
+        #     if is_valid:
+        #         yield event.chain_result(Video.fromFileSystem(path=downloaded_file))
+        #         os.remove(downloaded_file)
+        #         async for r in self._generate_response(event, result):
+        #             yield r
+        #     else:
+        #         return
+        return str(result)
 
     @llm_tool("web_search_news")
     async def search_news(self, query: str) -> str:
@@ -317,6 +316,10 @@ async def is_validate_image_url(img_url) -> bool:
         pass
     return False
 
+async def is_valid_video_url(video_url) -> bool:
+    raise NotImplementedError
+
+
 
 async def is_valid_video_url_with_download(url: str, download_path: str | None = None) -> (bool, str):
     """
@@ -356,7 +359,6 @@ async def is_valid_video_url_with_download(url: str, download_path: str | None =
 
     return False, ""
 
-
 async def filter_and_select_results_async(result: SearchResult, categories: str) -> SearchResult:
     if categories == "images":
         # 提取所有 img_src
@@ -368,7 +370,7 @@ async def filter_and_select_results_async(result: SearchResult, categories: str)
         # 提取所有 iframe_src
         urls = [item.iframe_src for item in result.results if item.iframe_src]
         # 对每个 URL 进行异步验证
-        validation_results = await asyncio.gather(*[is_valid_video_url_with_download(url) for url in urls])
+        validation_results = await asyncio.gather(*[is_valid_video_url(url) for url in urls])
     else:
         return result
 
