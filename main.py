@@ -3,8 +3,10 @@ import logging
 import os
 import re
 from typing import Optional
+from urllib.parse import urlparse
 
 import aiohttp
+import requests
 from readability import Document
 
 from astrbot.api import *
@@ -37,6 +39,32 @@ def is_valid_url(url):
     )
     return url_pattern.match(url) is not None
 
+def download_image_as_temp(url):
+    try:
+        # 检查文件格式，通过解析 URL 中的路径来判断图片类型（jpg 或 png 等）
+        parsed_url = urlparse(url)
+        file_extension = os.path.splitext(parsed_url.path)[-1].lower()
+        image_format = file_extension[1:] if file_extension.startswith(".") else "jpg"  # 默认 jpg
+
+        # 动态调整文件名后缀，比如 temp/temp.png 或 temp/temp.jpg
+        temp_folder = "temp"
+        os.makedirs(temp_folder, exist_ok=True)
+        save_as = os.path.join(temp_folder, f"temp.{image_format}")
+
+        # 下载图片
+        response = requests.get(url, stream=True)
+        if response.status_code == 200:
+            with open(save_as, "wb") as img_file:
+                for chunk in response.iter_content(1024):
+                    img_file.write(chunk)
+            logger.info(f"图片已保存为: {save_as}")
+            return f"{temp_folder}/{save_as}"
+        else:
+            logger.info(f"图片下载失败，状态码: {response.status_code}，URL: {url}")
+            return None
+    except Exception as e:
+        logger.info(f"下载图片时出错: {e}, URL: {url}")
+        return None
 
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.0",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
@@ -187,7 +215,13 @@ class WebSearcherPro(Star):
         if not results:
             return "No images found for your query."
         for result in results.results:
-            event.image_result(result.img_src)
+            #event.image_result(result.img_src)
+            path = download_image_as_temp(result.img_src)
+            if path:
+                event.image_result(path)
+            else:
+                logger.error(f"Download image failed for URL: {result.img_src}")
+
         return f"{image_llm_prefix} {results}"
 
     @llm_tool("web_search_videos")
