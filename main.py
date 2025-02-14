@@ -3,6 +3,8 @@ import json
 import logging
 import os
 import random
+import yt_dlp
+
 from typing import Optional
 
 import aiohttp
@@ -15,6 +17,8 @@ from astrbot.core.message.components import Video
 from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
 
 logger = logging.getLogger("astrbot")
+temp_path = "./temp"
+
 
 image_llm_prefix = "The images have been sent to the user. Below is the description of the images:\n"
 
@@ -56,7 +60,7 @@ class WebSearcherPro(Star):
                         if not data.get("results"):
                             return None
 
-                        results = SearchResult(
+                        result = SearchResult(
                             results=[
                                 SearchResultItem(
                                     title=item.get('title', ''),
@@ -73,10 +77,10 @@ class WebSearcherPro(Star):
 
                         if categories == "images" or categories == "videos":
                             # Validate url.
-                            results = await filter_valid_urls_async(results, categories)
+                            result = await filter_and_select_results_async(result, categories)
 
-                        results.results = results.results[:limit]
-                        return results
+                        result.results = result.results[:limit]
+                        return result
                     else:
                         logger.error(f"Failed to search SearxNG. HTTP Status: {response.status}, Params: {params}")
                         return None
@@ -87,7 +91,7 @@ class WebSearcherPro(Star):
         except Exception as e:
             logger.error(f"Unexpected error during fetch_search_results: {e}")
         
-    async def _generate_response(self, event: AstrMessageEvent, results: SearchResult):
+    async def _generate_response(self, event: AstrMessageEvent, result: SearchResult):
         provider = self.context.get_using_provider()
         if provider:
             description_generate_prompt = (
@@ -96,7 +100,7 @@ class WebSearcherPro(Star):
                 f"如果是图片，那么随机挑选的其中一张图片已被发送给用户，"
                 f"如果是视频，那么搜索结果中第一个视频已被发送给用户，"
                 f"请根据下述信息，基于你的角色以合适的语气、称呼等，生成符合人设的解说。\n\n"
-                f"信息：{str(results)}"
+                f"信息：{str(result)}"
             )
 
             conversation_id = await self.context.conversation_manager.get_curr_conversation_id(event.unified_msg_origin)
@@ -159,10 +163,10 @@ class WebSearcherPro(Star):
             query (string): A search query used to fetch general web-based information.
         """
         logger.info(f"Starting general search for: {query}")
-        results = await self.search(query, categories="general")
-        if not results or not results.results:
+        result = await self.search(query, categories="general")
+        if not result or not result.results:
             return "No information found for your query."
-        return str(results)
+        return str(result)
 
     @llm_tool("web_search_images")
     async def search_images(self, event: AstrMessageEvent, query: str):
@@ -172,19 +176,19 @@ class WebSearcherPro(Star):
             query (string): A search query used to fetch image-based results.
         """
         logger.info(f"Starting image search for: {query}")
-        results = await self.search(query, categories="images", limit=20)
-        if not results or not results.results:
+        result = await self.search(query, categories="images", limit=20)
+        if not result or not result.results:
             return
-        selected_image = random.choice(results.results)
+        selected_image = random.choice(result.results)
         if isinstance(selected_image, SearchResultItem):
             yield event.image_result(selected_image.img_src)
-            results.results = [selected_image]
+            result.results = [selected_image]
         else:
             logger.error("Random image selection failed.")
             return
         try:
-            async for result in self._generate_response(event, results):
-                yield result
+            async for r in self._generate_response(event, result):
+                yield r
         except Exception as e:
             logger.error(f"调用 generate_response 时出错: {e}")
             yield event.plain_result("❌ 生成回复时失败，请查看控制台日志")
@@ -197,12 +201,19 @@ class WebSearcherPro(Star):
             query (string): A search query used to retrieve video-based results.
         """
         logger.info(f"Starting video search for: {query}")
-        results = await self.search(query, categories="videos")
-        if not results or not results.results:
+        result = await self.search(query, categories="videos")
+        if not result or not result.results:
             return
-        selected_video = results.results[0]
+        selected_video = result.results[0]
         if isinstance(selected_video, SearchResultItem):
-            yield event.chain_result(Video.fromURL(selected_video.img_src))
+            is_valid, downloaded_file = await is_valid_video_url_with_download(selected_video.iframe_src, temp_path)
+            if is_valid:
+                yield event.chain_result(Video.fromFileSystem(path=downloaded_file))
+                os.remove(downloaded_file)
+                async for r in self._generate_response(event, result):
+                    yield r
+            else:
+                return
 
     @llm_tool("web_search_news")
     async def search_news(self, query: str) -> str:
@@ -306,31 +317,58 @@ async def is_validate_image_url(img_url) -> bool:
         pass
     return False
 
-async def is_valid_video_url(url):
+
+async def is_valid_video_url_with_download(url: str, download_path: str | None = None) -> (bool, str):
+    """
+    检查视频 URL 是否有效并可选地下载到本地。
+
+    参数：
+    url: str               视频的 URL。
+    download_path: str     （可选）要保存视频的路径。如果为 None，则仅验证 URL。
+
+    返回：
+    Tuple[bool, str]       返回一个元组，其中第一个值表示 URL 是否有效，第二个值为下载的视频文件路径（如果下载过）。
+    """
     if not url:
-        return False
+        return False, ""
+
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'skip_download': True  # 默认仅验证，不下载视频
+    }
+
+    if download_path:
+        ydl_opts.update({
+            'outtmpl': f'{download_path}/%(title)s.%(ext)s',
+            'skip_download': False  # 允许下载视频
+        })
+
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.head(url, timeout=10) as response:
-                content_type = response.headers.get("Content-Type", "").lower()
-                if response.status == 200 and ("video" in content_type):
-                    return True
-    except Exception:
-        pass
-    return False
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url, download=bool(download_path))  # 验证或下载
+            if info_dict:
+                downloaded_file = f"{download_path}/{info_dict.get('title', 'temp')}.{info_dict.get('ext', 'mp4')}" if download_path else ""
+                return True, downloaded_file
+    except Exception as e:
+        logger.error(f"Error validating or downloading video URL: {e}")
+        return False, ""
+
+    return False, ""
 
 
-async def filter_valid_urls_async(result: SearchResult, categories: str) -> SearchResult:
+async def filter_and_select_results_async(result: SearchResult, categories: str) -> SearchResult:
     if categories == "images":
         # 提取所有 img_src
         urls = [item.img_src for item in result.results if item.img_src]
         # 对每个 URL 进行异步验证
         validation_results = await asyncio.gather(*[is_validate_image_url(url) for url in urls])
+
     elif categories == "videos":
         # 提取所有 iframe_src
         urls = [item.iframe_src for item in result.results if item.iframe_src]
         # 对每个 URL 进行异步验证
-        validation_results = await asyncio.gather(*[is_valid_video_url(url) for url in urls])
+        validation_results = await asyncio.gather(*[is_valid_video_url_with_download(url) for url in urls])
     else:
         return result
 
@@ -338,5 +376,10 @@ async def filter_valid_urls_async(result: SearchResult, categories: str) -> Sear
     result.results = [
         item for item, is_valid in zip(result.results, validation_results) if is_valid
     ]
+
+    if categories == "images":
+        result.results = random.choice(result.results[:20])
+    elif categories == "videos":
+        result.results = result.results[:1]
     logger.error(f"{result}")
     return result
