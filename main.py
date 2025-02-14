@@ -2,9 +2,10 @@ import json
 import logging
 import os
 import re
-from typing import Optional
+from typing import Optional, AsyncGenerator
 
 import aiohttp
+import requests
 from readability import Document
 
 from astrbot.api import *
@@ -36,6 +37,41 @@ def is_valid_url(url):
         r'(#[a-zA-Z0-9]*)?$'  # 可选锚点
     )
     return url_pattern.match(url) is not None
+
+
+def filter_valid_image_urls(original_result: SearchResult) -> SearchResult:
+    """
+    检查 SearchResult 中的图片 URL 是否有效，并移除不可用的图片。
+
+    参数:
+        original_result (SearchResult): 包含图片 URL 的搜索结果对象。
+
+    返回:
+        SearchResult: 过滤后的包含有效图片 URL 的对象。
+    """
+    valid_results = []
+
+    for item in original_result.results:
+        img_url = item.img_src
+
+        # 检查 URL 的有效性
+        if not img_url:
+            continue
+
+        try:
+            # 使用 HEAD 请求验证图片地址是否有效
+            response = requests.head(img_url, timeout=5)
+            if response.status_code == 200 and "image" in response.headers.get("Content-Type", "").lower():
+                valid_results.append(item)
+            else:
+                print(f"Invalid image URL (not an image or bad status): {img_url}")
+        except requests.RequestException as e:
+            print(f"Error accessing image URL: {img_url}, error: {e}")
+
+    # 更新搜索结果
+    original_result.results = valid_results
+    return original_result
+
 
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.0",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
@@ -79,15 +115,21 @@ class WebSearcherPro(Star):
                             results=[
                                 SearchResultItem(
                                     title=item.get('title', ''),
-                                    url=item.get('url', '') if is_valid_url(item.get('url', '')) else '',
-                                    img_src=item.get('img_src', '') if is_valid_url(item.get('img_src', '')) else '',
+                                    url=item.get('url', ''),
+                                    img_src=item.get('img_src', ''),
                                     content=item.get('content', ''),
                                     engine=item.get('engine', ''),
                                     score=item.get('score', 0.0)
                                 )
-                                for item in data.get("results", [])[:limit]
+                                for item in data.get("results", [])
                             ]
                         )
+
+                        if categories == "images":
+                            # Validate images.
+                            results = filter_valid_image_urls(results)
+
+                        results.results = results.results[:limit]
                         return results
                     else:
                         logger.error(f"Failed to search SearxNG. HTTP Status: {response.status}, Params: {params}")
@@ -99,28 +141,26 @@ class WebSearcherPro(Star):
         except Exception as e:
             logger.error(f"Unexpected error during fetch_search_results: {e}")
         
-    async def _generate_response(self, event: AstrMessageEvent, result_type: str, query: str, results: SearchResult):
-        for item in results.results:
-            yield event.image_result(item.img_src)
-
+    async def _generate_response(self, event: AstrMessageEvent, query: str, results: SearchResult):
         provider = self.context.get_using_provider()
         if provider:
-            description_generate_prefix = (
-                f"以下是关于用户查询的`{query}`相关信息，"
-                f"查询的{result_type}已经被发送给用户"
-                "请根据查询的信息基于你的角色以合适的语气、称呼等，生成符合人设的回答"
-                f"查询信息：{str(results)}"
+            description_generate_prompt = (
+                f"你已经依据用户请求`{event.get_message_str()}`发起了函数调用，"
+                f"以下是通过函数调用获取的`{query}`相关信息，"
+                f"如果是图片或视频，那么该内容已被发送给用户，"
+                f"请根据下述相关内容信息，基于你的角色以合适的语气、称呼等，生成符合人设的解说。\n\n"
+                f"函数调用结果：{str(results)}"
             )
             urls = []
             for item in results.results:
                 if item.url:
-                    urls.append(item.url)
+                    urls.append(item.img_src)
 
             conversation_id = await self.context.conversation_manager.get_curr_conversation_id(event.unified_msg_origin)
             conversation = await self.context.conversation_manager.get_conversation(event.unified_msg_origin,
                                                                                     conversation_id)
             yield event.request_llm(
-                prompt=description_generate_prefix,
+                prompt=description_generate_prompt,
                 func_tool_manager=None,
                 session_id=event.session_id,
                 contexts=json.loads(conversation.history),
@@ -191,9 +231,11 @@ class WebSearcherPro(Star):
         logger.info(f"Starting image search for: {query}")
         results = await self.search(query, categories="images", limit=5)
         if not results:
-            return
+            yield
+        for item in results.results:
+            yield event.image_result(item.img_src)
         try:
-            async for result in self._generate_response(event, "image", query, results):
+            async for result in self._generate_response(event, query, results):
                 yield result
         except Exception as e:
             logger.error(f"调用 generate_response 时出错: {e}")
