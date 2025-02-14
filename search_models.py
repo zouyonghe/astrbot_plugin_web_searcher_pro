@@ -8,6 +8,7 @@ class SearchResultItem:
     title: str
     url: str
     img_src: str
+    iframe_src: str
     content: str
     engine: str
     score: float

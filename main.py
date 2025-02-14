@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import random
-import re
 from typing import Optional
 
 import aiohttp
@@ -12,6 +11,7 @@ from readability import Document
 from astrbot.api import *
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
+from astrbot.core.message.components import Video
 from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
 
 logger = logging.getLogger("astrbot")
@@ -62,17 +62,18 @@ class WebSearcherPro(Star):
                                     title=item.get('title', ''),
                                     url=item.get('url', ''),
                                     img_src=item.get('img_src', ''),
+                                    iframe_src=item.get('iframe_src', ''),
                                     content=item.get('content', ''),
                                     engine=item.get('engine', ''),
-                                    score=item.get('score', 0.0)
+                                    score=item.get('score', 0.0),
                                 )
                                 for item in data.get("results", [])
                             ]
                         )
 
-                        if categories == "images":
-                            # Validate images.
-                            results = await filter_valid_image_urls_async(results)
+                        if categories == "images" or categories == "videos":
+                            # Validate url.
+                            results = await filter_valid_urls_async(results, categories)
 
                         results.results = results.results[:limit]
                         return results
@@ -189,7 +190,7 @@ class WebSearcherPro(Star):
             yield event.plain_result("❌ 生成回复时失败，请查看控制台日志")
 
     @llm_tool("web_search_videos")
-    async def search_videos(self, event: AstrMessageEvent, query: str) -> str:
+    async def search_videos(self, event: AstrMessageEvent, query: str):
         """Search the web for videos
 
         Args:
@@ -198,8 +199,10 @@ class WebSearcherPro(Star):
         logger.info(f"Starting video search for: {query}")
         results = await self.search(query, categories="videos")
         if not results or not results.results:
-            return "No videos found for your query."
-        return str(results)
+            return
+        selected_video = results.results[0]
+        if isinstance(selected_video, SearchResultItem):
+            yield event.chain_result(Video.fromURL(selected_video.img_src))
 
     @llm_tool("web_search_news")
     async def search_news(self, query: str) -> str:
@@ -291,21 +294,6 @@ class WebSearcherPro(Star):
             logger.error(f"fetch_website_content 出现问题: {e}")
             return "Fetch URL failed, please try again later."
 
-
-def is_valid_url(url):
-    """简单验证是否符合 URL 格式"""
-    url_pattern = re.compile(
-        r'^(https?://)?'  # 支持 http 和 https
-        r'([a-zA-Z0-9.-]+)'  # 域名部分
-        r'(\.[a-zA-Z]{2,3})'  # 顶级域名 .com/.cn 等
-        r'(:\d+)?'  # 可选端口号
-        r'(/[-a-zA-Z0-9@:%._+~#=]*)*'  # URL 路径部分
-        r'(\?[;&a-zA-Z0-9%._+~#=-]*)?'  # 可选查询参数
-        r'(#[a-zA-Z0-9]*)?$'  # 可选锚点
-    )
-    return url_pattern.match(url) is not None
-
-
 async def is_validate_image_url(img_url) -> bool:
     if not img_url:
         return False
@@ -318,12 +306,34 @@ async def is_validate_image_url(img_url) -> bool:
         pass
     return False
 
+async def is_valid_video_url(url):
+    if not url:
+        return False
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.head(url, timeout=10) as response:
+                content_type = response.headers.get("Content-Type", "").lower()
+                if response.status == 200 and ("video" in content_type):
+                    return True
+    except Exception:
+        pass
+    return False
 
-async def filter_valid_image_urls_async(result: SearchResult) -> SearchResult:
-    # 提取所有 img_src
-    img_urls = [item.img_src for item in result.results if item.img_src]
-    # 对每个 URL 异步验证是否有效
-    validation_results = await asyncio.gather(*[is_validate_image_url(url) for url in img_urls])
+
+async def filter_valid_urls_async(result: SearchResult, categories: str) -> SearchResult:
+    if categories == "images":
+        # 提取所有 img_src
+        urls = [item.img_src for item in result.results if item.img_src]
+        # 对每个 URL 进行异步验证
+        validation_results = await asyncio.gather(*[is_validate_image_url(url) for url in urls])
+    elif categories == "videos":
+        # 提取所有 iframe_src
+        urls = [item.iframe_src for item in result.results if item.iframe_src]
+        # 对每个 URL 进行异步验证
+        validation_results = await asyncio.gather(*[is_valid_video_url(url) for url in urls])
+    else:
+        return result
+
     # 根据验证结果过滤原始结果
     result.results = [
         item for item, is_valid in zip(result.results, validation_results) if is_valid
