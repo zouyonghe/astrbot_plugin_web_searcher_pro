@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import re
 from typing import Optional
 
@@ -135,11 +136,12 @@ class WebSearcherPro(Star):
         provider = self.context.get_using_provider()
         if provider:
             description_generate_prompt = (
-                f"你已经依据用户请求`{event.get_message_str()}`发起了函数调用，"
+                f"你已经依据用户请求的`{event.get_message_str()}`发起了函数调用，"
                 f"以下是通过函数调用获取的`{query}`相关信息，"
-                f"如果是图片或视频，那么该内容已被发送给用户，"
-                f"请根据下述相关内容信息，基于你的角色以合适的语气、称呼等，生成符合人设的解说。\n\n"
-                f"函数调用结果：{str(results)}"
+                f"如果是图片，那么随机挑选的一张图片已被发送给用户，"
+                f"如果是视频，那么搜索结果中第一个视频已被发送给用户，"
+                f"请根据下述相关信息，基于你的角色以合适的语气、称呼等，生成符合人设的解说。\n\n"
+                f"信息：{str(results)}"
             )
             urls = []
             for item in results.results:
@@ -219,17 +221,19 @@ class WebSearcherPro(Star):
             query (string): A search query used to fetch image-based results.
         """
         logger.info(f"Starting image search for: {query}")
-        results = await self.search(query, categories="images", limit=5)
+        results = await self.search(query, categories="images", limit=10)
         if not results:
             return
-        for item in results.results:
-            yield event.image_result(item.img_src)
-        # try:
-        #     async for result in self._generate_response(event, query, results):
-        #         yield result
-        # except Exception as e:
-        #     logger.error(f"调用 generate_response 时出错: {e}")
-        #     yield event.plain_result("❌ 生成回复时失败，请查看控制台日志")
+        selected_image = random.choice(results.results)
+        results.results = [selected_image]
+        yield event.image_result(selected_image.img_src)
+
+        try:
+            async for result in self._generate_response(event, query, results):
+                yield result
+        except Exception as e:
+            logger.error(f"调用 generate_response 时出错: {e}")
+            yield event.plain_result("❌ 生成回复时失败，请查看控制台日志")
 
     @llm_tool("web_search_videos")
     async def search_videos(self, event: AstrMessageEvent, query: str) -> str:
