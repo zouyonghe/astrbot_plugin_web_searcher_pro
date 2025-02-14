@@ -221,7 +221,7 @@ class WebSearcherPro(Star):
         logger.info(f"Starting image search for: {query}")
         results = await self.search(query, categories="images", limit=5)
         if not results:
-            yield
+            return
         for item in results.results:
             yield event.image_result(item.img_src)
         # try:
