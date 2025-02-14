@@ -177,9 +177,10 @@ class WebSearcherPro(Star):
         return str(results)
 
     async def _show_images(self, event: AstrMessageEvent, results: SearchResult):
-        for result in results.results:
-            logger.info(f"Sending image: {result.url}")
-            yield event.image_result(result.url)
+        # for result in results.results:
+        #     logger.info(f"Sending image: {result.url}")
+        #     yield event.image_result(result.url)
+        yield event.image_result("")
 
     @llm_tool("web_search_images")
     async def search_images(self, event: AstrMessageEvent, query: str) -> str:
@@ -192,7 +193,8 @@ class WebSearcherPro(Star):
         results = await self.search(query, categories="images", limit=5)
         if not results:
             return "No images found for your query."
-        self._show_images(event, results)
+        event.plain_result("test")
+        #self._show_images(event, results)
         return f"{image_llm_prefix} {results}"
 
     @llm_tool("web_search_videos")
