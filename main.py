@@ -1,11 +1,11 @@
+import asyncio
 import json
 import logging
 import os
 import re
-from typing import Optional, AsyncGenerator
+from typing import Optional
 
 import aiohttp
-import requests
 from readability import Document
 
 from astrbot.api import *
@@ -39,36 +39,26 @@ def is_valid_url(url):
     return url_pattern.match(url) is not None
 
 
-def filter_valid_image_urls(original_result: SearchResult) -> SearchResult:
-    """
-    检查 SearchResult 中的图片 URL 是否有效，并移除不可用的图片。
+async def validate_image_url(img_url):
+    if not img_url:
+        return None
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.head(img_url, timeout=2) as response:
+                if response.status == 200 and "image" in response.headers.get("Content-Type", "").lower():
+                    return img_url
+    except Exception:
+        pass
+    return None
 
-    参数:
-        original_result (SearchResult): 包含图片 URL 的搜索结果对象。
 
-    返回:
-        SearchResult: 过滤后的包含有效图片 URL 的对象。
-    """
-    valid_results = []
+async def filter_valid_image_urls_async(original_result):
+    img_urls = [item.img_src for item in original_result.results if item.img_src]
+    tasks = [validate_image_url(url) for url in img_urls]
 
-    for item in original_result.results:
-        img_url = item.img_src
+    results = await asyncio.gather(*tasks)  # 并行处理请求
+    valid_results = [item for item in original_result.results if item.img_src in results]
 
-        # 检查 URL 的有效性
-        if not img_url:
-            continue
-
-        try:
-            # 使用 HEAD 请求验证图片地址是否有效
-            response = requests.head(img_url, timeout=5)
-            if response.status_code == 200 and "image" in response.headers.get("Content-Type", "").lower():
-                valid_results.append(item)
-            else:
-                print(f"Invalid image URL (not an image or bad status): {img_url}")
-        except requests.RequestException as e:
-            print(f"Error accessing image URL: {img_url}, error: {e}")
-
-    # 更新搜索结果
     original_result.results = valid_results
     return original_result
 
