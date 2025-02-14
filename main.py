@@ -138,7 +138,7 @@ class WebSearcherPro(Star):
         return str(results)
 
     @llm_tool("web_search_images")
-    async def search_images(self, event: AstrMessageEvent, query: str) -> str:
+    async def search_images(self, event: AstrMessageEvent, query: str):
         """Search the web for images
 
         Args:
@@ -147,15 +147,16 @@ class WebSearcherPro(Star):
         logger.info(f"Starting image search for: {query}")
         results = await self.search(query, categories="images", limit=5)
         if not results:
-            return "No images found for your query."
+            yield event.plain_result("No images found for your query.")
+            #return "No images found for your query."
         chain = []
         for result in results.results:
             #event.image_result(result.img_src)
             logger.error(result.img_src)
             #event.make_result().url_image(result.img_src)
             chain.append(Image.fromURL(result.img_src))
-        event.chain_result(chain)
-        return f"{image_llm_prefix} {results}"
+        yield event.chain_result(chain)
+        #return f"{image_llm_prefix} {results}"
 
     @llm_tool("web_search_videos")
     async def search_videos(self, event: AstrMessageEvent, query: str) -> str:
