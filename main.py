@@ -124,6 +124,28 @@ class WebSearcherPro(Star):
         else:
             yield event.plain_result("操作参数错误，应为 on 或 off")
 
+    async def send_images(self, event: AstrMessageEvent, urls: list):
+        """Send images to the user based on provided URLs.
+    
+        Args:
+            event (AstrMessageEvent): The event triggering this action.
+            urls (list): A list of image URLs to be sent.
+        """
+        try:
+            images = []
+            for url in urls:
+                if is_valid_url(url):
+                    images.append(Image.fromURL(url))
+                else:
+                    logger.error(f"Invalid image URL: {url}")
+            if images:
+                yield event.chain_result(images)
+            else:
+                yield event.plain_result("No valid images to send.")
+        except Exception as e:
+            logger.error(f"Error while sending images: {e}")
+            yield event.plain_result("Failed to send images. Please try again later.")
+
     @llm_tool("web_search")
     async def search_general(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for general information
@@ -149,13 +171,13 @@ class WebSearcherPro(Star):
         if not results:
             yield event.plain_result("No images found for your query.")
             #return "No images found for your query."
-        chain = []
+        urls = []
         for result in results.results:
-            #event.image_result(result.img_src)
             logger.error(result.img_src)
             #event.make_result().url_image(result.img_src)
-            chain.append(Image.fromURL(result.img_src))
-        yield event.chain_result(chain)
+            urls.append(result.img_src)
+        async for result in self.send_images(event, urls):
+            yield result
         yield event.plain_result(f"{results}")
         #return f"{image_llm_prefix} {results}"
 
