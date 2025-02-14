@@ -165,7 +165,7 @@ class WebSearcherPro(Star):
         """
         logger.info(f"Starting general search for: {query}")
         results = await self.search(query, categories="general")
-        if not results:
+        if not results or not results.results:
             return "No information found for your query."
         return str(results)
 
@@ -178,7 +178,7 @@ class WebSearcherPro(Star):
         """
         logger.info(f"Starting image search for: {query}")
         results = await self.search(query, categories="images", limit=20)
-        if not results:
+        if not results or not results.results:
             return
         # # 验证所有图片链接的有效性，并筛选出有效图片
         # valid_results = await filter_valid_image_urls_async(results)
@@ -209,7 +209,7 @@ class WebSearcherPro(Star):
         """
         logger.info(f"Starting video search for: {query}")
         results = await self.search(query, categories="videos")
-        if not results:
+        if not results or not results.results:
             return "No videos found for your query."
         return str(results)
 
@@ -222,7 +222,9 @@ class WebSearcherPro(Star):
         """
         logger.info(f"Starting news search for: {query}")
         results = await self.search(query, categories="news")
-        if not results:
+        if not results or not results.results:
+            return "No news found for your query."
+        if not results or not results.results:
             return "No news found for your query."
         return str(results)
 
@@ -235,7 +237,7 @@ class WebSearcherPro(Star):
         """
         logger.info(f"Starting science search for: {query}")
         results = await self.search(query, categories="science")
-        if not results:
+        if not results or not results.results:
             return "No science information found for your query."
         return str(results)
 
@@ -248,7 +250,7 @@ class WebSearcherPro(Star):
         """
         logger.info(f"Starting music search for: {query}")
         results = await self.search(query, categories="music")
-        if not results:
+        if not results or not results.results:
             return "No music found for your query."
         return str(results)
 
@@ -261,7 +263,7 @@ class WebSearcherPro(Star):
         """
         logger.info(f"Starting technical search for: {query}")
         results = await self.search(query, categories="technical")
-        if not results:
+        if not results or not results.results:
             return "No technical information found for your query."
         return str(results)
 
@@ -274,7 +276,7 @@ class WebSearcherPro(Star):
         """
         logger.info(f"Starting academic search for: {query}")
         results = await self.search(query, categories="academic")
-        if not results:
+        if not results or not results.results:
             return "No academic information found for your query."
         return str(results)
 
@@ -330,8 +332,12 @@ async def is_validate_image_url(img_url) -> bool:
 
 
 async def filter_valid_image_urls_async(result: SearchResult) -> SearchResult:
+    # 提取所有 img_src
     img_urls = [item.img_src for item in result.results if item.img_src]
-    tasks = [is_validate_image_url(url) for url in img_urls]
-    results = await asyncio.gather(*tasks)  # 并行处理请求
-    result.results = [item for item in result.results if item.img_src in results]
+    # 对每个 URL 异步验证是否有效
+    validation_results = await asyncio.gather(*[is_validate_image_url(url) for url in img_urls])
+    # 根据验证结果过滤原始结果
+    result.results = [
+        item for item, is_valid in zip(result.results, validation_results) if is_valid
+    ]
     return result
