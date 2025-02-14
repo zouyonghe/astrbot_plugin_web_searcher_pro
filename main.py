@@ -338,4 +338,5 @@ async def filter_valid_urls_async(result: SearchResult, categories: str) -> Sear
     result.results = [
         item for item, is_valid in zip(result.results, validation_results) if is_valid
     ]
+    logger.error(f"{result}")
     return result
