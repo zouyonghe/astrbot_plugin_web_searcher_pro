@@ -196,6 +196,7 @@ class WebSearcherPro(Star):
             return
         yield event.plain_result("test")
         yield self._show_images(event, results)
+        yield event.plain_result("test2")
         #return f"{image_llm_prefix} {results}"
 
     @llm_tool("web_search_videos")
