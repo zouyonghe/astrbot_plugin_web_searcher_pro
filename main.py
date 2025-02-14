@@ -3,10 +3,8 @@ import logging
 import os
 import re
 from typing import Optional
-from urllib.parse import urlparse
 
 import aiohttp
-import requests
 from readability import Document
 
 from astrbot.api import *
@@ -194,8 +192,12 @@ class WebSearcherPro(Star):
         results = await self.search(query, categories="images", limit=5)
         if not results:
             return
-        async for result in self._generate_response(event, "image", query, results):
-            yield result
+        try:
+            async for result in self._generate_response(event, "image", query, results):
+                yield result
+        except Exception as e:
+            logger.error(f"调用 generate_response 时出错: {e}")
+            yield event.plain_result("❌ 生成回复时失败，请查看控制台日志")
 
     @llm_tool("web_search_videos")
     async def search_videos(self, event: AstrMessageEvent, query: str) -> str:
