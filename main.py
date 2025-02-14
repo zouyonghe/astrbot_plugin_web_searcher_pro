@@ -18,13 +18,23 @@ logger = logging.getLogger("astrbot")
 
 image_llm_prefix = "The images have been sent to the user. Below is the description of the images:\n"
 
-def is_valid_url(url: str):
+# def is_valid_url(url: str):
+#     try:
+#         result = urlparse(url)
+#         # 检查网络协议是否为 http 或 https 且包含域名
+#         return all([result.scheme in ("http", "https"), result.netloc])
+#     except Exception:
+#         return False
+
+async def is_valid_url(url):
+    """验证 URL 是否有效"""
     try:
-        result = urlparse(url)
-        # 检查网络协议是否为 http 或 https 且包含域名
-        return all([result.scheme in ("http", "https"), result.netloc])
+        async with aiohttp.ClientSession() as session:
+            async with session.head(url) as response:
+                return response.status == 200
     except Exception:
         return False
+
 
 
 async def download_image_from_url(url):
@@ -171,6 +181,10 @@ class WebSearcherPro(Star):
         assert isinstance(event, AiocqhttpMessageEvent)
         client = event.bot
         for result in results.results:
+            if not await is_valid_url(result.img_src):
+                logger.warning(f"Invalid or unreachable URL: {result.img_src}")
+                continue
+
             image_file = await download_image_from_url(result.img_src)
             if not image_file:
                 logger.warning(f"Skipping image due to download failure: {result.url}")
