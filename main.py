@@ -149,14 +149,25 @@ class WebSearcherPro(Star):
         if not results:
             event.plain_result("No images found for your query.")
             return "No images found for your query."
-        images = []
-        for result in results.results:
-            #logger.error(result.img_src)
-            images.append(Image.fromURL(result.url))
-            #event.make_result().url_image(result.img_src)
-            #urls.append(result.img_src)
-        event.chain_result(images)
-        event.plain_result(f"{results}")
+        from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import AiocqhttpMessageEvent
+        assert isinstance(event, AiocqhttpMessageEvent)
+        client = event.bot
+        if not event.is_private_chat():
+            for result in results.results:
+                await client.send_group_msg(
+                    group_id=int(event.get_group_id()),
+                    message=f"[CQ:image,file={result.url}]",
+                    auto_escape=False,
+                    self_id=int(event.get_self_id()),
+                )
+        else:
+            for result in results.results:
+                await client.send_private_msg(
+                    user_id=int(event.get_sender_id()),
+                    message=f"[CQ:image,file={result.url}]",
+                    auto_escape=False,
+                    self_id=int(event.get_self_id()),
+                )
         return f"{image_llm_prefix} {results}"
 
     @llm_tool("web_search_videos")
