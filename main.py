@@ -189,7 +189,7 @@ class WebSearcherPro(Star):
             return
 
         # 从有效图片中随机选择一张
-        selected_image = random.choice(valid_results)
+        selected_image = random.choice(valid_results.results)
         results.results = [selected_image]  # 更新仅包含随机选取的图片
 
         try:
