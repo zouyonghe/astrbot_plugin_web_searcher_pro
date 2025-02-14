@@ -4,6 +4,7 @@ import uuid
 from typing import Optional
 
 import aiohttp
+from aiohttp import TCPConnector
 from readability import Document
 
 from astrbot.api import *
