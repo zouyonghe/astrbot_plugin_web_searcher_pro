@@ -1,4 +1,6 @@
 import logging
+import os
+import uuid
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -23,6 +25,22 @@ def is_valid_url(url: str):
         return all([result.scheme in ("http", "https"), result.netloc])
     except Exception:
         return False
+
+
+async def download_image_from_url(url):
+    """下载图片并保存到本地"""
+    temp_dir = "/app/.config/QQ/NapCat/temp"
+    temp_file = os.path.join(temp_dir, f"{uuid.uuid4()}.jpg")  # 保存为 jpg 格式
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                with open(temp_file, "wb") as f:
+                    f.write(await response.read())
+                    return temp_file
+            else:
+                logger.warning(f"Failed to download image: {url}")
+                return None
+
 
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.0",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
@@ -152,22 +170,26 @@ class WebSearcherPro(Star):
         from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import AiocqhttpMessageEvent
         assert isinstance(event, AiocqhttpMessageEvent)
         client = event.bot
-        if not event.is_private_chat():
-            for result in results.results:
-                await client.send_group_msg(
-                    group_id=int(event.get_group_id()),
-                    message=f"[CQ:image,file={result.url}]",
-                    auto_escape=False,
-                    self_id=int(event.get_self_id()),
-                )
-        else:
-            for result in results.results:
+        for result in results.results:
+            image_file = await download_image_from_url(result.img_src)
+            if not image_file:
+                logger.warning(f"Skipping image due to download failure: {result.url}")
+                continue
+            if event.is_private_chat():
                 await client.send_private_msg(
                     user_id=int(event.get_sender_id()),
-                    message=f"[CQ:image,file={result.url}]",
+                    message=f"[CQ:image,file={image_file}]",
                     auto_escape=False,
                     self_id=int(event.get_self_id()),
                 )
+            else:
+                await client.send_group_msg(
+                    group_id=int(event.get_group_id()),
+                    message=f"[CQ:image,file={image_file}]",
+                    auto_escape=False,
+                    self_id=int(event.get_self_id()),
+                )
+                os.remove(image_file)
         return f"{image_llm_prefix} {results}"
 
     @llm_tool("web_search_videos")
