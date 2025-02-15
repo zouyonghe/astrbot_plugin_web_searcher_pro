@@ -334,7 +334,7 @@ async def _validate_and_download_video(url: str, download_path: str | None = Non
         'quiet': True,
         'no_warnings': True,
         'skip_download': True, # 默认仅验证，不下载视频
-        #'proxy': 'http://192.168.50.3:7890',
+        'proxy': 'http://192.168.50.3:7890',
     }
 
     # 添加 Cookies 文件
@@ -418,6 +418,7 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
         # 对每个 URL 进行异步验证
         # validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
         for item in result.results:
+            logger.error(f"test: {item.iframe_src}")
             if await _is_valid_video_url(item.img_src):
                 result.results = [item]
                 return result
