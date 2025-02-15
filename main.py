@@ -175,10 +175,10 @@ class WebSearcherPro(Star):
         result = await self.search(query, categories="images", limit=20)
         if not result or not result.results:
             return
-        selected_image = random.choice(result.results)
-        if isinstance(selected_image, SearchResultItem):
-            yield event.image_result(selected_image.img_src)
-            result.results = [selected_image]
+        image = random.choice(result.results)
+        if isinstance(image, SearchResultItem):
+            yield event.image_result(image.img_src)
+            result.results = [image]
         else:
             logger.error("Random image selection failed.")
             return
