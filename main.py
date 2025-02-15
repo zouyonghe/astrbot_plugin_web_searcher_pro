@@ -13,7 +13,6 @@ from astrbot.api import *
 from astrbot.api.event import AstrMessageEvent
 from astrbot.api.event.filter import *
 from astrbot.api.star import Context, Star, register
-from astrbot.core.message.components import Video
 from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
 
 logger = logging.getLogger("astrbot")
@@ -193,22 +192,8 @@ class WebSearcherPro(Star):
         logger.info(f"Starting video search for: {query}")
         result = await self.search(query, categories="videos", limit=5)
         if not result or not result.results:
-            # return "No videos found for your query."
             logger.error("No videos found.")
-            return
-        # video = result.results[0]
-        # if isinstance(video, SearchResultItem):
-        #     try:
-        #         downloaded_file = await _download_video(video.iframe_src)
-        #         if downloaded_file == "":
-        #             yield event.plain_result("下载视频失败，请稍候再试")
-        #             return
-        #         yield event.chain_result(Video.fromFileSystem(path=downloaded_file))
-        #         os.remove(downloaded_file)
-        #         async for r in self._generate_response(event, result):
-        #             yield r
-        #     except Exception as e:
-        #         logger.error(f"下载文件失败，报错: {e}")
+            return "No videos found for your query."
         return str(result)
 
     @llm_tool("web_search_news")
@@ -220,8 +205,6 @@ class WebSearcherPro(Star):
         """
         logger.info(f"Starting news search for: {query}")
         results = await self.search(query, categories="news")
-        if not results or not results.results:
-            return "No news found for your query."
         if not results or not results.results:
             return "No news found for your query."
         return str(results)
@@ -313,88 +296,6 @@ async def _is_validate_image_url(img_url) -> bool:
         pass
     return False
 
-async def _validate_and_download_video(url: str, download_path: str | None = None) -> (bool, str):
-    """
-    检查视频 URL 是否有效并可选地下载到本地。
-
-    参数：
-    url: str               视频的 URL。
-    download_path: str     （可选）要保存视频的路径。如果为 None，则仅验证 URL。
-
-    返回：
-    Tuple[bool, str]       返回一个元组，其中第一个值表示 URL 是否有效，第二个值为下载的视频文件路径（如果下载过）。
-    """
-    if not url:
-        return False, ""
-
-    cookies_file = "ytb-cookies.txt"
-
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'skip_download': True, # 默认仅验证，不下载视频
-        'proxy': 'http://192.168.50.3:7890',
-        'cookiefile': cookies_file if os.path.exists(cookies_file) else None,
-        'verbose': True,  # 启用详细调试日志
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'
-
-    }
-
-    if download_path:
-        ydl_opts.update({
-            'outtmpl': f'{download_path}/temp.%(ext)s',
-            'skip_download': False  # 允许下载视频
-        })
-
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-
-            logger.info("Starting to extract info...")
-            info_dict = ydl.extract_info(url, download=bool(download_path))  # 验证或下载
-            logger.info("Extraction completed.")
-
-            if info_dict:
-                downloaded_file = f"{download_path}/temp.{info_dict.get('ext', 'mp4')}" if download_path else ""
-                return True, downloaded_file
-    except Exception as e:
-        logger.error(f"{e}")
-        return False, ""
-
-    return False, ""
-
-
-async def _is_valid_video_url(video_url) -> bool:
-    """
-    Validates if a video URL is functional and can be processed.
-
-    Args:
-        video_url (str): The video URL to validate.
-
-    Returns:
-        bool: True if the video URL is valid, False otherwise.
-    """
-    is_valid, _ = await _validate_and_download_video(video_url)
-    return is_valid
-
-
-async def _download_video(video_url):
-    """
-    Downloads a video from the provided video URL if valid.
-
-    Args:
-        video_url (str): The video URL to download.
-
-    Returns:
-        str: The file path of the downloaded video, or an empty string if invalid.
-    """
-    if not video_url:
-        return ""
-
-    download_path = temp_path  # You can configure this path as needed.
-    is_valid, downloaded_file = await _validate_and_download_video(video_url, download_path)
-    return downloaded_file if is_valid else ""
-
-
 async def result_filter(result: SearchResult, categories: str, limit: int) -> Optional[SearchResult]:
     if categories == "images":
         result.results = result.results[:20]
@@ -404,20 +305,6 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
             item for item, is_valid in zip(result.results, validation_results) if is_valid
         ]
         result.results = [random.choice(result.results)]
-        return result
-    # elif categories == "videos":
-    #     result.results = result.results[:3]
-    #     # 提取所有 iframe_src
-    #     # urls = [item.iframe_src for item in result.results if item.iframe_src]
-    #     # 对每个 URL 进行异步验证
-    #     # validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
-    #     for item in result.results:
-    #         logger.error(f"LEN: {len(result.results)}")
-    #         if await _is_valid_video_url(item.url):
-    #             result.results = [item]
-    #             return result
-    #         logger.error("here called")
-    #     return None
     else:
         result.results = result.results[:limit]
-        return result
+    return result

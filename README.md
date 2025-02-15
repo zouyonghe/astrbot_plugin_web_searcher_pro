@@ -1,6 +1,4 @@
-# helloworld
-
-WebSearcherPro 插件
+# WebSearcherPro 插件
 
 更高性能的 Web 检索 AstrBot 插件，支持多种类别的内容搜索以及 URL 内容提取。
 
