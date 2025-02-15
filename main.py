@@ -205,7 +205,10 @@ class WebSearcherPro(Star):
         video = result.results[0]
         if isinstance(video, SearchResultItem):
             try:
-                downloaded_file = await _download_video(video.iframe_src)
+                downloaded_file = _download_video(video.iframe_src)
+                if downloaded_file == "":
+                    yield event.plain_result("下载视频失败，请稍候再试")
+                    return
                 yield event.chain_result(Video.fromFileSystem(path=downloaded_file))
                 os.remove(downloaded_file)
                 async for r in self._generate_response(event, result):
@@ -370,7 +373,7 @@ def _validate_and_download_video(url: str, download_path: str | None = None) -> 
     return False, ""
 
 
-async def _is_valid_video_url(video_url) -> bool:
+def _is_valid_video_url(video_url) -> bool:
     """
     Validates if a video URL is functional and can be processed.
 
@@ -384,7 +387,7 @@ async def _is_valid_video_url(video_url) -> bool:
     return is_valid
 
 
-async def _download_video(video_url):
+def _download_video(video_url):
     """
     Downloads a video from the provided video URL if valid.
 
@@ -398,7 +401,7 @@ async def _download_video(video_url):
         return ""
 
     download_path = temp_path  # You can configure this path as needed.
-    is_valid, downloaded_file = await _validate_and_download_video(video_url, download_path)
+    is_valid, downloaded_file = _validate_and_download_video(video_url, download_path)
     return downloaded_file if is_valid else ""
 
 
