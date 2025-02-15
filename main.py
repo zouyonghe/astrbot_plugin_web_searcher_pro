@@ -352,20 +352,22 @@ def _validate_and_download_video(url: str, download_path: str | None = None) -> 
             'skip_download': False  # 允许下载视频
         })
 
+    # try:
+    #     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    #
+    #         logger.info("Starting to extract info...")
+    #         info_dict = ydl.extract_info(url, download=bool(download_path))  # 验证或下载
+    #         logger.info("Extraction completed.")
+    #
+    #         if info_dict:
+    #             downloaded_file = f"{download_path}/temp.{info_dict.get('ext', 'mp4')}" if download_path else ""
+    #             return True, downloaded_file
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-
-            logger.info("Starting to extract info...")
-            info_dict = ydl.extract_info(url, download=bool(download_path))  # 验证或下载
-            logger.info("Extraction completed.")
-
-            if info_dict:
-                downloaded_file = f"{download_path}/temp.{info_dict.get('ext', 'mp4')}" if download_path else ""
-                return True, downloaded_file
-    except GeneratorExit:
-        logger.warning("GeneratorExit encountered. Cleaning up resources.")
-        return False, ""
-
+        ydl = yt_dlp.YoutubeDL(ydl_opts)
+        info_dict = ydl.extract_info(url, download=bool(download_path))
+        if info_dict:
+            downloaded_file = f"{download_path}/temp.{info_dict.get('ext', 'mp4')}" if download_path else ""
+            return True, downloaded_file
     except Exception as e:
         logger.error(f"{e}")
         return False, ""
