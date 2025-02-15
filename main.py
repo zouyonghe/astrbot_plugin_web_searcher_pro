@@ -173,6 +173,7 @@ class WebSearcherPro(Star):
         """
         logger.info(f"Starting image search for: {query}")
         result = await self.search(query, categories="images")
+        logger.info(f"result: {result}")
         if result and result.results:
             yield event.image_result(result.results[0].img_src)
         try:
