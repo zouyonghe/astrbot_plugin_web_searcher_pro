@@ -412,7 +412,9 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
         ]
         result.results = [random.choice(result.results)]
     elif categories == "videos":
-        result.results = result.results[:10]
+        logger.error("check videos available")
+        result.results = result.results[:3]
+        logger.error(f"test: {result}")
         # 提取所有 iframe_src
         # urls = [item.iframe_src for item in result.results if item.iframe_src]
         # 对每个 URL 进行异步验证
