@@ -219,7 +219,7 @@ class WebSearcherPro(Star):
         return str(result)
 
     @llm_tool("web_search_news")
-    async def search_news(self, query: str) -> str:
+    async def search_news(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for news
 
         Args:
