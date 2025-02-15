@@ -411,6 +411,7 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
             item for item, is_valid in zip(result.results, validation_results) if is_valid
         ]
         result.results = [random.choice(result.results)]
+        return result
     # elif categories == "videos":
     #     result.results = result.results[:3]
     #     # 提取所有 iframe_src
