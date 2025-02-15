@@ -424,6 +424,7 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
             if _is_valid_video_url(item.url):
                 result.results = [item]
                 return result
+            logger.error("here called")
         return None
     else:
         result.results = result.results[:limit]
