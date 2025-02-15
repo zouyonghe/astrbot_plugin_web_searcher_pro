@@ -76,7 +76,7 @@ class WebSearcherPro(Star):
                                 for item in data.get("results", [])
                             ]
                         )
-                        return await filter_and_select_results_async(result, categories, limit)
+                        return await result_filter(result, categories, limit)
                     else:
                         logger.error(f"Failed to search SearxNG. HTTP Status: {response.status}, Params: {params}")
                         return None
@@ -333,7 +333,8 @@ async def _validate_and_download_video(url: str, download_path: str | None = Non
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
-        'skip_download': True  # 默认仅验证，不下载视频
+        'skip_download': True, # 默认仅验证，不下载视频
+        #'proxy': 'http://192.168.50.3:7890',
     }
 
     # 添加 Cookies 文件
@@ -401,14 +402,11 @@ async def _download_video(video_url):
     return downloaded_file if is_valid else ""
 
 
-async def filter_and_select_results_async(result: SearchResult, categories: str, limit: int) -> Optional[SearchResult]:
+async def result_filter(result: SearchResult, categories: str, limit: int) -> Optional[SearchResult]:
     if categories == "images":
         result.results = result.results[:20]
-        # 提取所有 img_src
         urls = [item.img_src for item in result.results if item.img_src]
-        # 对每个 URL 进行异步验证
         validation_results = await asyncio.gather(*[_is_validate_image_url(url) for url in urls])
-        # 根据验证结果过滤原始结果
         result.results = [
             item for item, is_valid in zip(result.results, validation_results) if is_valid
         ]
@@ -420,12 +418,9 @@ async def filter_and_select_results_async(result: SearchResult, categories: str,
         # 对每个 URL 进行异步验证
         # validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
         for item in result.results:
-            is_valid = await _is_valid_video_url(item.url)
-            if is_valid:
+            if await _is_valid_video_url(item.img_src):
                 result.results = [item]
-                logging.error("HERE 1")
                 return result
-        logging.error("HERE 2")
         return None
     else:
         result.results = result.results[:limit]
