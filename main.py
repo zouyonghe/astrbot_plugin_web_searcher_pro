@@ -333,26 +333,18 @@ def _validate_and_download_video(url: str, download_path: str | None = None) -> 
     if not url:
         return False, ""
 
+    cookies_file = "ytb-cookies.txt"
+
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
         'skip_download': True, # 默认仅验证，不下载视频
         'proxy': 'http://192.168.50.3:7890',
-    }
-
-    # 添加 Cookies 文件
-    cookies_file = "ytb-cookies.txt"
-    if os.path.exists(cookies_file):
-        ydl_opts['cookiefile'] = cookies_file  # 设置 cookie 文件路径
-    else:
-        logger.error(f"Cookies file not found: {cookies_file}")
-
-    # 配置 User-Agent 和防爬虫选项
-    ydl_opts.update({
-        'sleep-interval': 5,
-        'max-sleep-interval': 10,
+        'cookiefile': cookies_file if os.path.exists(cookies_file) else None,
+        'verbose': True,  # 启用详细调试日志
         'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'
-    })
+
+    }
 
     if download_path:
         ydl_opts.update({
@@ -362,10 +354,18 @@ def _validate_and_download_video(url: str, download_path: str | None = None) -> 
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+
+            logger.info("Starting to extract info...")
             info_dict = ydl.extract_info(url, download=bool(download_path))  # 验证或下载
+            logger.info("Extraction completed.")
+
             if info_dict:
                 downloaded_file = f"{download_path}/temp.{info_dict.get('ext', 'mp4')}" if download_path else ""
                 return True, downloaded_file
+    except GeneratorExit:
+        logger.warning("GeneratorExit encountered. Cleaning up resources.")
+        return False, ""
+
     except Exception as e:
         logger.error(f"{e}")
         return False, ""
