@@ -24,6 +24,9 @@ class SearchResult:
 
     def __str__(self) -> str:
         """提供结果的字符串形式"""
+        if not self.results:  # 如果 results 为空
+            return "No results."
+
         formatted_results = [
             f"{idx + 1}. {item.title}\nLink: {item.url}\nContent: {item.content}"
             for idx, item in enumerate(self.results)

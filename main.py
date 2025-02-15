@@ -92,9 +92,9 @@ class WebSearcherPro(Star):
         if provider:
             description_generate_prompt = (
                 f"你已经依据用户的请求`{event.get_message_str()}`发起了Web搜索的函数调用，"
-                f"以下是函数调用返回的结果，"
-                f"如果是图片，那么随机挑选的其中一张图片已被发送给用户，"
-                f"如果是视频，那么搜索结果中第一个视频已被发送给用户，"
+                f"以下是函数调用返回的结果，可能搜索到，也可能没有，"
+                f"如果搜索的类型是图片，那么图片将发送给用户，"
+                f"如果搜索的类型是视频，那么视频将不会被发送，"
                 f"请根据下述信息，基于你的角色以合适的语气、称呼等，生成符合人设的解说。\n\n"
                 f"信息：{str(result)}"
             )
@@ -173,16 +173,8 @@ class WebSearcherPro(Star):
         """
         logger.info(f"Starting image search for: {query}")
         result = await self.search(query, categories="images")
-        if not result or not result.results:
-            logger.error("No images found.")
-            return
-        image = random.choice(result.results)
-        if isinstance(image, SearchResultItem):
-            yield event.image_result(image.img_src)
-            result.results = [image]
-        else:
-            logger.error("Random image selection failed.")
-            return
+        if result and result.results:
+            yield event.image_result(result.results[0].img_src)
         try:
             async for r in self._generate_response(event, result):
                 yield r
