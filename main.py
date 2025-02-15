@@ -420,8 +420,8 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
         # 对每个 URL 进行异步验证
         # validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
         for item in result.results:
-            logger.error(f"test: {item.iframe_src}")
-            if await _is_valid_video_url(item.iframe_src):
+            logger.error(f"test: {item.url}")
+            if await _is_valid_video_url(item.url):
                 result.results = [item]
                 return result
         return None
