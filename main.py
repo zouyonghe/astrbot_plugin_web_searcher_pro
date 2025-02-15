@@ -32,7 +32,7 @@ class WebSearcherPro(Star):
         self.config = config
         self.proxy = os.environ.get("https_proxy")
 
-    async def search(self, query: str, categories: str = "general", limit: int = 10) -> Optional[SearchResult]:
+    async def search(self, query: str, categories: str = "general", limit: int = 5) -> Optional[SearchResult]:
         """Perform a search query for a specific category.
     
         Args:
@@ -172,7 +172,7 @@ class WebSearcherPro(Star):
             query (string): A search query used to fetch image-based results.
         """
         logger.info(f"Starting image search for: {query}")
-        result = await self.search(query, categories="images", limit=20)
+        result = await self.search(query, categories="images")
         if not result or not result.results:
             return
         image = random.choice(result.results)
@@ -197,7 +197,7 @@ class WebSearcherPro(Star):
             query (string): A search query used to retrieve video-based results.
         """
         logger.info(f"Starting video search for: {query}")
-        result = await self.search(query, categories="videos", limit=5)
+        result = await self.search(query, categories="videos")
         if not result or not result.results:
             # return "No videos found for your query."
             logger.error("No videos!")
@@ -403,14 +403,18 @@ async def _download_video(video_url):
 
 async def filter_and_select_results_async(result: SearchResult, categories: str, limit: int) -> Optional[SearchResult]:
     if categories == "images":
-        result.results = result.results[:50]
+        result.results = result.results[:20]
         # 提取所有 img_src
         urls = [item.img_src for item in result.results if item.img_src]
         # 对每个 URL 进行异步验证
         validation_results = await asyncio.gather(*[_is_validate_image_url(url) for url in urls])
-
+        # 根据验证结果过滤原始结果
+        result.results = [
+            item for item, is_valid in zip(result.results, validation_results) if is_valid
+        ]
+        result.results = [random.choice(result.results)]
     elif categories == "videos":
-        result.results = result.results[:20]
+        result.results = result.results[:10]
         # 提取所有 iframe_src
         # urls = [item.iframe_src for item in result.results if item.iframe_src]
         # 对每个 URL 进行异步验证
@@ -419,20 +423,10 @@ async def filter_and_select_results_async(result: SearchResult, categories: str,
             is_valid = await _is_valid_video_url(item.url)
             if is_valid:
                 result.results = [item]
+                logging.error("HERE 1")
                 return result
+        logging.error("HERE 2")
         return None
     else:
-        return result
-
-    # 根据验证结果过滤原始结果
-    result.results = [
-        item for item, is_valid in zip(result.results, validation_results) if is_valid
-    ]
-
-    if categories == "images":
-        result.results = [random.choice(result.results)]
-    elif categories == "videos":
-        result.results = result.results[:1]
-    else:
         result.results = result.results[:limit]
-    return result
+        return result
