@@ -347,12 +347,12 @@ def _validate_and_download_video(url: str, download_path: str | None = None) -> 
     else:
         logger.error(f"Cookies file not found: {cookies_file}")
 
-    # # 配置 User-Agent 和防爬虫选项
-    # ydl_opts.update({
-    #     'sleep-interval': 5,
-    #     'max-sleep-interval': 10,
-    #     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    # })
+    # 配置 User-Agent 和防爬虫选项
+    ydl_opts.update({
+        'sleep-interval': 5,
+        'max-sleep-interval': 10,
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'
+    })
 
     if download_path:
         ydl_opts.update({
