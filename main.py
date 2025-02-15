@@ -307,7 +307,7 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
         result.results = result.results[:limit]
     return result
 
-def find_highest_resolution_image(result: SearchResult) -> Optional[SearchResultItem]:
+def find_highest_resolution_image(result: SearchResult) -> SearchResult:
     """
     从 SearchResult 中找到分辨率最高的图片。
     :param result: SearchResult 实例，包含多个 SearchResultItem。
@@ -330,7 +330,7 @@ def find_highest_resolution_image(result: SearchResult) -> Optional[SearchResult
             except ValueError:
                 # 如果分辨率解析失败，则跳过
                 continue
-
-    return max_item
+    result.results = [max_item]
+    return result
 
 
