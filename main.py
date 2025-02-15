@@ -197,7 +197,6 @@ class WebSearcherPro(Star):
             query (string): A search query used to retrieve video-based results.
         """
         logger.info(f"Starting video search for: {query}")
-        logger.error(f"pwd: {os.getcwd()}")
         result = await self.search(query, categories="videos", limit=5)
         if not result or not result.results:
             # return "No videos found for your query."
@@ -342,6 +341,13 @@ async def _validate_and_download_video(url: str, download_path: str | None = Non
         ydl_opts['cookiefile'] = cookies_file
     else:
         logger.error(f"Cookies file not found: {cookies_file}")
+
+    # 配置 User-Agent 和防爬虫选项
+    ydl_opts.update({
+        'sleep-interval': 5,
+        'max-sleep-interval': 10,
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    })
 
     if download_path:
         ydl_opts.update({
