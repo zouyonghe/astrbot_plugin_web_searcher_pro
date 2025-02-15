@@ -200,11 +200,12 @@ class WebSearcherPro(Star):
         result = await self.search(query, categories="videos", limit=5)
         if not result or not result.results:
             # return "No videos found for your query."
+            logger.error("No videos!")
             return
-        selected_video = result.results[0]
-        if isinstance(selected_video, SearchResultItem):
+        video = result.results[0]
+        if isinstance(video, SearchResultItem):
             try:
-                downloaded_file = await _download_video(selected_video.iframe_src)
+                downloaded_file = await _download_video(video.iframe_src)
                 yield event.chain_result(Video.fromFileSystem(path=downloaded_file))
                 os.remove(downloaded_file)
                 async for r in self._generate_response(event, result):
@@ -400,7 +401,7 @@ async def _download_video(video_url):
     return downloaded_file if is_valid else ""
 
 
-async def filter_and_select_results_async(result: SearchResult, categories: str, limit: int) -> SearchResult:
+async def filter_and_select_results_async(result: SearchResult, categories: str, limit: int) -> Optional[SearchResult]:
     if categories == "images":
         result.results = result.results[:50]
         # 提取所有 img_src
@@ -409,11 +410,17 @@ async def filter_and_select_results_async(result: SearchResult, categories: str,
         validation_results = await asyncio.gather(*[_is_validate_image_url(url) for url in urls])
 
     elif categories == "videos":
-        result.results = result.results[:10]
+        result.results = result.results[:20]
         # 提取所有 iframe_src
-        urls = [item.iframe_src for item in result.results if item.iframe_src]
+        # urls = [item.iframe_src for item in result.results if item.iframe_src]
         # 对每个 URL 进行异步验证
-        validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
+        # validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
+        for item in result.results:
+            is_valid = await _is_valid_video_url(item.url)
+            if is_valid:
+                result.results = [item]
+                return result
+        return None
     else:
         return result
 
