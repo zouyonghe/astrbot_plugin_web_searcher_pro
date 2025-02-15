@@ -174,6 +174,7 @@ class WebSearcherPro(Star):
         logger.info(f"Starting image search for: {query}")
         result = await self.search(query, categories="images")
         if not result or not result.results:
+            logger.error("No images found.")
             return
         image = random.choice(result.results)
         if isinstance(image, SearchResultItem):
@@ -200,7 +201,7 @@ class WebSearcherPro(Star):
         result = await self.search(query, categories="videos", limit=5)
         if not result or not result.results:
             # return "No videos found for your query."
-            logger.error("No videos!")
+            logger.error("No videos found.")
             return
         # video = result.results[0]
         # if isinstance(video, SearchResultItem):
