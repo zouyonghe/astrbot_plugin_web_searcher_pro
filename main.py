@@ -197,25 +197,25 @@ class WebSearcherPro(Star):
             query (string): A search query used to retrieve video-based results.
         """
         logger.info(f"Starting video search for: {query}")
-        result = await self.search(query, categories="videos")
+        result = await self.search(query, categories="videos", limit=5)
         if not result or not result.results:
             # return "No videos found for your query."
             logger.error("No videos!")
             return
-        video = result.results[0]
-        if isinstance(video, SearchResultItem):
-            try:
-                downloaded_file = await _download_video(video.iframe_src)
-                if downloaded_file == "":
-                    yield event.plain_result("下载视频失败，请稍候再试")
-                    return
-                yield event.chain_result(Video.fromFileSystem(path=downloaded_file))
-                os.remove(downloaded_file)
-                async for r in self._generate_response(event, result):
-                    yield r
-            except Exception as e:
-                logger.error(f"下载文件失败，报错: {e}")
-        # return str(result)
+        # video = result.results[0]
+        # if isinstance(video, SearchResultItem):
+        #     try:
+        #         downloaded_file = await _download_video(video.iframe_src)
+        #         if downloaded_file == "":
+        #             yield event.plain_result("下载视频失败，请稍候再试")
+        #             return
+        #         yield event.chain_result(Video.fromFileSystem(path=downloaded_file))
+        #         os.remove(downloaded_file)
+        #         async for r in self._generate_response(event, result):
+        #             yield r
+        #     except Exception as e:
+        #         logger.error(f"下载文件失败，报错: {e}")
+        return str(result)
 
     @llm_tool("web_search_news")
     async def search_news(self, query: str) -> str:
@@ -410,19 +410,19 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
             item for item, is_valid in zip(result.results, validation_results) if is_valid
         ]
         result.results = [random.choice(result.results)]
-    elif categories == "videos":
-        result.results = result.results[:3]
-        # 提取所有 iframe_src
-        # urls = [item.iframe_src for item in result.results if item.iframe_src]
-        # 对每个 URL 进行异步验证
-        # validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
-        for item in result.results:
-            logger.error(f"LEN: {len(result.results)}")
-            if await _is_valid_video_url(item.url):
-                result.results = [item]
-                return result
-            logger.error("here called")
-        return None
+    # elif categories == "videos":
+    #     result.results = result.results[:3]
+    #     # 提取所有 iframe_src
+    #     # urls = [item.iframe_src for item in result.results if item.iframe_src]
+    #     # 对每个 URL 进行异步验证
+    #     # validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
+    #     for item in result.results:
+    #         logger.error(f"LEN: {len(result.results)}")
+    #         if await _is_valid_video_url(item.url):
+    #             result.results = [item]
+    #             return result
+    #         logger.error("here called")
+    #     return None
     else:
         result.results = result.results[:limit]
         return result
