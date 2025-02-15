@@ -418,7 +418,7 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
         # validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
         for item in result.results:
             logger.error(f"LEN: {len(result.results)}")
-            if _is_valid_video_url(item.url):
+            if await _is_valid_video_url(item.url):
                 result.results = [item]
                 return result
             logger.error("here called")
