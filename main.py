@@ -316,7 +316,7 @@ async def _is_validate_image_url(img_url) -> bool:
         pass
     return False
 
-async def _validate_and_download_video(url: str, download_path: str | None = None) -> (bool, str):
+def _validate_and_download_video(url: str, download_path: str | None = None) -> (bool, str):
     """
     检查视频 URL 是否有效并可选地下载到本地。
 
@@ -340,16 +340,16 @@ async def _validate_and_download_video(url: str, download_path: str | None = Non
     # 添加 Cookies 文件
     cookies_file = "ytb-cookies.txt"
     if os.path.exists(cookies_file):
-        ydl_opts['cookiefile'] = cookies_file
+        ydl_opts['cookiefile'] = cookies_file  # 设置 cookie 文件路径
     else:
         logger.error(f"Cookies file not found: {cookies_file}")
 
-    # 配置 User-Agent 和防爬虫选项
-    ydl_opts.update({
-        'sleep-interval': 5,
-        'max-sleep-interval': 10,
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    })
+    # # 配置 User-Agent 和防爬虫选项
+    # ydl_opts.update({
+    #     'sleep-interval': 5,
+    #     'max-sleep-interval': 10,
+    #     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    # })
 
     if download_path:
         ydl_opts.update({
@@ -380,7 +380,7 @@ async def _is_valid_video_url(video_url) -> bool:
     Returns:
         bool: True if the video URL is valid, False otherwise.
     """
-    is_valid, _ = await _validate_and_download_video(video_url)
+    is_valid, _ = _validate_and_download_video(video_url)
     return is_valid
 
 
@@ -412,16 +412,13 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
         ]
         result.results = [random.choice(result.results)]
     elif categories == "videos":
-        logger.error("check videos available")
         result.results = result.results[:3]
-        logger.error(f"test: {result}")
         # 提取所有 iframe_src
         # urls = [item.iframe_src for item in result.results if item.iframe_src]
         # 对每个 URL 进行异步验证
         # validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
         for item in result.results:
-            logger.error(f"test: {item.url}")
-            if await _is_valid_video_url(item.url):
+            if _is_valid_video_url(item.url):
                 result.results = [item]
                 return result
         return None
