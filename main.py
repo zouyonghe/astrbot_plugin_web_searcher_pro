@@ -2,11 +2,9 @@ import asyncio
 import json
 import logging
 import os
-import random
 from typing import Optional, Dict
 
 import aiohttp
-import yt_dlp
 from readability import Document
 
 from astrbot.api import *
@@ -67,6 +65,7 @@ class WebSearcherPro(Star):
                                     title=item.get('title', ''),
                                     url=item.get('url', ''),
                                     img_src=item.get('img_src', ''),
+                                    resolution=item.get('resolution', ''),
                                     iframe_src=item.get('iframe_src', ''),
                                     content=item.get('content', ''),
                                     engine=item.get('engine', ''),
@@ -303,7 +302,35 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
         result.results = [
             item for item, is_valid in zip(result.results, validation_results) if is_valid
         ]
-        result.results = [random.choice(result.results)]
+        result = find_highest_resolution_image(result)
     else:
         result.results = result.results[:limit]
     return result
+
+def find_highest_resolution_image(result: SearchResult) -> Optional[SearchResultItem]:
+    """
+    从 SearchResult 中找到分辨率最高的图片。
+    :param result: SearchResult 实例，包含多个 SearchResultItem。
+    :return: 分辨率最高的 SearchResultItem，如果没有有效的分辨率则返回 None。
+    """
+    max_item = None
+    max_area = 0
+
+    for item in result:
+        # 提取 resolution 字段，并解析成宽度和高度
+        if item.resolution:
+            try:
+                width, height = map(int, item.resolution.lower().replace('x', '×').split('×'))
+                area = width * height
+
+                # 如果当前图片的面积更大，则更新最大值
+                if area > max_area:
+                    max_area = area
+                    max_item = item
+            except ValueError:
+                # 如果分辨率解析失败，则跳过
+                continue
+
+    return max_item
+
+
