@@ -197,6 +197,7 @@ class WebSearcherPro(Star):
             query (string): A search query used to retrieve video-based results.
         """
         logger.info(f"Starting video search for: {query}")
+        logger.error(f"pwd: {os.getcwd()}")
         result = await self.search(query, categories="videos", limit=5)
         if not result or not result.results:
             # return "No videos found for your query."
@@ -204,14 +205,11 @@ class WebSearcherPro(Star):
         selected_video = result.results[0]
         if isinstance(selected_video, SearchResultItem):
             try:
-                is_valid, downloaded_file = await _download_video(selected_video.iframe_src)
-                if is_valid:
-                    yield event.chain_result(Video.fromFileSystem(path=downloaded_file))
-                    os.remove(downloaded_file)
-                    async for r in self._generate_response(event, result):
-                        yield r
-                else:
-                    return
+                downloaded_file = await _download_video(selected_video.iframe_src)
+                yield event.chain_result(Video.fromFileSystem(path=downloaded_file))
+                os.remove(downloaded_file)
+                async for r in self._generate_response(event, result):
+                    yield r
             except Exception as e:
                 logger.error(f"下载文件失败，报错: {e}")
         # return str(result)
