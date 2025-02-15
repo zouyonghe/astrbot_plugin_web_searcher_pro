@@ -205,7 +205,7 @@ class WebSearcherPro(Star):
         video = result.results[0]
         if isinstance(video, SearchResultItem):
             try:
-                downloaded_file = _download_video(video.iframe_src)
+                downloaded_file = await _download_video(video.iframe_src)
                 if downloaded_file == "":
                     yield event.plain_result("下载视频失败，请稍候再试")
                     return
@@ -319,7 +319,7 @@ async def _is_validate_image_url(img_url) -> bool:
         pass
     return False
 
-def _validate_and_download_video(url: str, download_path: str | None = None) -> (bool, str):
+async def _validate_and_download_video(url: str, download_path: str | None = None) -> (bool, str):
     """
     检查视频 URL 是否有效并可选地下载到本地。
 
@@ -352,22 +352,16 @@ def _validate_and_download_video(url: str, download_path: str | None = None) -> 
             'skip_download': False  # 允许下载视频
         })
 
-    # try:
-    #     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-    #
-    #         logger.info("Starting to extract info...")
-    #         info_dict = ydl.extract_info(url, download=bool(download_path))  # 验证或下载
-    #         logger.info("Extraction completed.")
-    #
-    #         if info_dict:
-    #             downloaded_file = f"{download_path}/temp.{info_dict.get('ext', 'mp4')}" if download_path else ""
-    #             return True, downloaded_file
     try:
-        ydl = yt_dlp.YoutubeDL(ydl_opts)
-        info_dict = ydl.extract_info(url, download=bool(download_path))
-        if info_dict:
-            downloaded_file = f"{download_path}/temp.{info_dict.get('ext', 'mp4')}" if download_path else ""
-            return True, downloaded_file
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+
+            logger.info("Starting to extract info...")
+            info_dict = ydl.extract_info(url, download=bool(download_path))  # 验证或下载
+            logger.info("Extraction completed.")
+
+            if info_dict:
+                downloaded_file = f"{download_path}/temp.{info_dict.get('ext', 'mp4')}" if download_path else ""
+                return True, downloaded_file
     except Exception as e:
         logger.error(f"{e}")
         return False, ""
@@ -375,7 +369,7 @@ def _validate_and_download_video(url: str, download_path: str | None = None) -> 
     return False, ""
 
 
-def _is_valid_video_url(video_url) -> bool:
+async def _is_valid_video_url(video_url) -> bool:
     """
     Validates if a video URL is functional and can be processed.
 
@@ -385,11 +379,11 @@ def _is_valid_video_url(video_url) -> bool:
     Returns:
         bool: True if the video URL is valid, False otherwise.
     """
-    is_valid, _ = _validate_and_download_video(video_url)
+    is_valid, _ = await _validate_and_download_video(video_url)
     return is_valid
 
 
-def _download_video(video_url):
+async def _download_video(video_url):
     """
     Downloads a video from the provided video URL if valid.
 
@@ -403,7 +397,7 @@ def _download_video(video_url):
         return ""
 
     download_path = temp_path  # You can configure this path as needed.
-    is_valid, downloaded_file = _validate_and_download_video(video_url, download_path)
+    is_valid, downloaded_file = await _validate_and_download_video(video_url, download_path)
     return downloaded_file if is_valid else ""
 
 
