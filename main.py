@@ -3,15 +3,15 @@ import json
 import logging
 import os
 import random
-import yt_dlp
-
-from typing import Optional
+from typing import Optional, Dict
 
 import aiohttp
+import yt_dlp
 from readability import Document
 
 from astrbot.api import *
-from astrbot.api.event import filter, AstrMessageEvent
+from astrbot.api.event import AstrMessageEvent
+from astrbot.api.event.filter import *
 from astrbot.api.star import Context, Star, register
 from astrbot.core.message.components import Video
 from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
@@ -19,8 +19,10 @@ from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchRes
 logger = logging.getLogger("astrbot")
 temp_path = "./temp"
 
-
 image_llm_prefix = "The images have been sent to the user. Below is the description of the images:\n"
+
+# 用于跟踪每个用户的状态，记录用户请求的时间和状态
+USER_STATES: Dict[str, Dict[str, float]] = {}
 
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.0",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
@@ -74,12 +76,7 @@ class WebSearcherPro(Star):
                                 for item in data.get("results", [])
                             ]
                         )
-                        if categories == "images":
-                            result.results = result.results[:50]
-                            result = await filter_and_select_results_async(result, categories)
-
-                        result.results = result.results[:limit]
-                        return result
+                        return await filter_and_select_results_async(result, categories, limit)
                     else:
                         logger.error(f"Failed to search SearxNG. HTTP Status: {response.status}, Params: {params}")
                         return None
@@ -115,7 +112,7 @@ class WebSearcherPro(Star):
                 conversation=conversation,
             )
 
-    @filter.command("websearch")
+    @command("websearch")
     async def websearch(self, event: AstrMessageEvent, operation: str = None):
         def update_websearch_status(status: bool):
             """更新网页搜索状态并保存配置."""
@@ -193,27 +190,31 @@ class WebSearcherPro(Star):
             yield event.plain_result("❌ 生成回复时失败，请查看控制台日志")
 
     @llm_tool("web_search_videos")
-    async def search_videos(self, event: AstrMessageEvent, query: str) -> str:
+    async def search_videos(self, event: AstrMessageEvent, query: str):
         """Search the web for videos
 
         Args:
             query (string): A search query used to retrieve video-based results.
         """
         logger.info(f"Starting video search for: {query}")
-        result = await self.search(query, categories="videos")
+        result = await self.search(query, categories="videos", limit=5)
         if not result or not result.results:
-            return "No videos found for your query."
-        # selected_video = result.results[0]
-        # if isinstance(selected_video, SearchResultItem):
-        #     is_valid, downloaded_file = await is_valid_video_url_with_download(selected_video.iframe_src, temp_path)
-        #     if is_valid:
-        #         yield event.chain_result(Video.fromFileSystem(path=downloaded_file))
-        #         os.remove(downloaded_file)
-        #         async for r in self._generate_response(event, result):
-        #             yield r
-        #     else:
-        #         return
-        return str(result)
+            # return "No videos found for your query."
+            return
+        selected_video = result.results[0]
+        if isinstance(selected_video, SearchResultItem):
+            try:
+                is_valid, downloaded_file = await _download_video(selected_video.iframe_src)
+                if is_valid:
+                    yield event.chain_result(Video.fromFileSystem(path=downloaded_file))
+                    os.remove(downloaded_file)
+                    async for r in self._generate_response(event, result):
+                        yield r
+                else:
+                    return
+            except Exception as e:
+                logger.error(f"下载文件失败，报错: {e}")
+        # return str(result)
 
     @llm_tool("web_search_news")
     async def search_news(self, query: str) -> str:
@@ -305,7 +306,7 @@ class WebSearcherPro(Star):
             logger.error(f"fetch_website_content 出现问题: {e}")
             return "Fetch URL failed, please try again later."
 
-async def is_validate_image_url(img_url) -> bool:
+async def _is_validate_image_url(img_url) -> bool:
     if not img_url:
         return False
     try:
@@ -317,12 +318,7 @@ async def is_validate_image_url(img_url) -> bool:
         pass
     return False
 
-async def is_valid_video_url(video_url) -> bool:
-    raise NotImplementedError
-
-
-
-async def is_valid_video_url_with_download(url: str, download_path: str | None = None) -> (bool, str):
+async def _validate_and_download_video(url: str, download_path: str | None = None) -> (bool, str):
     """
     检查视频 URL 是否有效并可选地下载到本地。
 
@@ -342,9 +338,16 @@ async def is_valid_video_url_with_download(url: str, download_path: str | None =
         'skip_download': True  # 默认仅验证，不下载视频
     }
 
+    # 添加 Cookies 文件
+    cookies_file = "ytb-cookies.txt"
+    if os.path.exists(cookies_file):
+        ydl_opts['cookiefile'] = cookies_file
+    else:
+        logger.error(f"Cookies file not found: {cookies_file}")
+
     if download_path:
         ydl_opts.update({
-            'outtmpl': f'{download_path}/%(title)s.%(ext)s',
+            'outtmpl': f'{download_path}/temp.%(ext)s',
             'skip_download': False  # 允许下载视频
         })
 
@@ -352,7 +355,7 @@ async def is_valid_video_url_with_download(url: str, download_path: str | None =
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(url, download=bool(download_path))  # 验证或下载
             if info_dict:
-                downloaded_file = f"{download_path}/{info_dict.get('title', 'temp')}.{info_dict.get('ext', 'mp4')}" if download_path else ""
+                downloaded_file = f"{download_path}/temp.{info_dict.get('ext', 'mp4')}" if download_path else ""
                 return True, downloaded_file
     except Exception as e:
         logger.error(f"Error validating or downloading video URL: {e}")
@@ -360,18 +363,53 @@ async def is_valid_video_url_with_download(url: str, download_path: str | None =
 
     return False, ""
 
-async def filter_and_select_results_async(result: SearchResult, categories: str) -> SearchResult:
+
+async def _is_valid_video_url(video_url) -> bool:
+    """
+    Validates if a video URL is functional and can be processed.
+
+    Args:
+        video_url (str): The video URL to validate.
+
+    Returns:
+        bool: True if the video URL is valid, False otherwise.
+    """
+    is_valid, _ = await _validate_and_download_video(video_url)
+    return is_valid
+
+
+async def _download_video(video_url):
+    """
+    Downloads a video from the provided video URL if valid.
+
+    Args:
+        video_url (str): The video URL to download.
+
+    Returns:
+        str: The file path of the downloaded video, or an empty string if invalid.
+    """
+    if not video_url:
+        return ""
+
+    download_path = temp_path  # You can configure this path as needed.
+    is_valid, downloaded_file = await _validate_and_download_video(video_url, download_path)
+    return downloaded_file if is_valid else ""
+
+
+async def filter_and_select_results_async(result: SearchResult, categories: str, limit: int) -> SearchResult:
     if categories == "images":
+        result.results = result.results[:50]
         # 提取所有 img_src
         urls = [item.img_src for item in result.results if item.img_src]
         # 对每个 URL 进行异步验证
-        validation_results = await asyncio.gather(*[is_validate_image_url(url) for url in urls])
+        validation_results = await asyncio.gather(*[_is_validate_image_url(url) for url in urls])
 
     elif categories == "videos":
+        result.results = result.results[:10]
         # 提取所有 iframe_src
         urls = [item.iframe_src for item in result.results if item.iframe_src]
         # 对每个 URL 进行异步验证
-        validation_results = await asyncio.gather(*[is_valid_video_url(url) for url in urls])
+        validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
     else:
         return result
 
@@ -384,4 +422,6 @@ async def filter_and_select_results_async(result: SearchResult, categories: str)
         result.results = [random.choice(result.results)]
     elif categories == "videos":
         result.results = result.results[:1]
+    else:
+        result.results = result.results[:limit]
     return result
