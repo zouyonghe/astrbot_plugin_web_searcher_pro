@@ -421,7 +421,7 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
         # validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
         for item in result.results:
             logger.error(f"test: {item.iframe_src}")
-            if await _is_valid_video_url(item.img_src):
+            if await _is_valid_video_url(item.iframe_src):
                 result.results = [item]
                 return result
         return None
