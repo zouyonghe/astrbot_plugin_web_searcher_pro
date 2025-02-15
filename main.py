@@ -367,7 +367,7 @@ def _validate_and_download_video(url: str, download_path: str | None = None) -> 
                 downloaded_file = f"{download_path}/temp.{info_dict.get('ext', 'mp4')}" if download_path else ""
                 return True, downloaded_file
     except Exception as e:
-        logger.error(f"Error validating or downloading video URL: {e}")
+        logger.error(f"{e}")
         return False, ""
 
     return False, ""
@@ -421,6 +421,7 @@ async def result_filter(result: SearchResult, categories: str, limit: int) -> Op
         # 对每个 URL 进行异步验证
         # validation_results = await asyncio.gather(*[_is_valid_video_url(url) for url in urls])
         for item in result.results:
+            logger.error(f"LEN: {len(result.results)}")
             if _is_valid_video_url(item.url):
                 result.results = [item]
                 return result
