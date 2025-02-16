@@ -88,20 +88,30 @@ class WebSearcherPro(Star):
     async def _generate_response(self, event: AstrMessageEvent, result: SearchResult):
         provider = self.context.get_using_provider()
         if provider:
-            description_generate_prompt = (
+
+            successed_prompt = (
                 f"你已经依据用户的请求`{event.get_message_str()}`发起了Web搜索的函数调用，"
                 f"以下是函数调用返回的结果，可能搜索到，也可能没有，"
-                f"如果搜索的类型是图片，那么图片将发送给用户，"
+                f"如果搜索的类型是图片，那么图片已被发送给用户，"
                 f"如果搜索的类型是视频，那么视频将不会被发送，"
                 f"请根据下述信息，基于你的角色以合适的语气、称呼等，生成符合人设的解说。\n\n"
                 f"信息：{str(result)}"
             )
 
+            failed_prompt = (
+                f"你已经依据用户的请求`{event.get_message_str()}`发起了Web搜索的函数调用，"
+                f"但是没有搜索到请求结果，基于你的角色以合适的语气、称呼等，回复用户。"
+            )
+            if not result or not result.results:
+                prompt = failed_prompt
+            else:
+                prompt = successed_prompt
+
             conversation_id = await self.context.conversation_manager.get_curr_conversation_id(event.unified_msg_origin)
             conversation = await self.context.conversation_manager.get_conversation(event.unified_msg_origin,
                                                                                     conversation_id)
             yield event.request_llm(
-                prompt=description_generate_prompt,
+                prompt=prompt,
                 func_tool_manager=None,
                 session_id=event.session_id,
                 contexts=json.loads(conversation.history),
