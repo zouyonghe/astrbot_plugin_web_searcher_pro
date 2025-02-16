@@ -114,7 +114,7 @@ class WebSearcherPro(Star):
                 prompt=prompt,
                 func_tool_manager=None,
                 session_id=event.session_id,
-                contexts=json.loads(conversation.history),
+                contexts=[],  # json.loads(conversation.history)  不提供历史对话
                 system_prompt=self.context.provider_manager.selected_default_persona.get("prompt", ""),
                 image_urls=[],
                 conversation=conversation,
