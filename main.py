@@ -89,12 +89,11 @@ class WebSearcherPro(Star):
         provider = self.context.get_using_provider()
         if provider:
 
-            successed_prompt = (
+            succeed_prompt = (
                 f"你已经依据用户的请求`{event.get_message_str()}`发起了Web搜索的函数调用，"
-                f"以下是函数调用返回的结果，可能搜索到，也可能没有，"
-                f"如果搜索的类型是图片，那么图片已被发送给用户，"
-                f"如果搜索的类型是视频，那么视频将不会被发送，"
-                f"请根据下述信息，基于你的角色以合适的语气、称呼等，生成符合人设的解说。\n\n"
+                f"以下是函数调用返回的结果，"
+                f"如果搜索的内容是图片，那么图片已被发送给用户，"
+                f"请根据下述信息，基于你的角色以合适的语气、称呼等，生成符合人设的图片介绍。\n\n"
                 f"信息：{str(result)}"
             )
 
@@ -105,7 +104,7 @@ class WebSearcherPro(Star):
             if not result or not result.results:
                 prompt = failed_prompt
             else:
-                prompt = successed_prompt
+                prompt = succeed_prompt
 
             conversation_id = await self.context.conversation_manager.get_curr_conversation_id(event.unified_msg_origin)
             conversation = await self.context.conversation_manager.get_conversation(event.unified_msg_origin,
