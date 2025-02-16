@@ -167,8 +167,7 @@ class WebSearcherPro(Star):
         """Search the web for images
 
         Args:
-            query (string): A search query focusing on the topic or keywords of the images (e.g., "nature" for nature-related images).
-            Avoid including general terms like "images," as the search is already scoped to image results.
+            query (string): A search query focusing on the topic or keywords of the images (e.g., "nature" for nature-related images). Avoid including general terms like "images," as the search is already scoped to image results.
         """
         logger.info(f"Starting image search for: {query}")
         result = await self.search(query, categories="images")
@@ -186,8 +185,7 @@ class WebSearcherPro(Star):
         """Search the web for videos
 
         Args:
-            query (string): A search query focusing on the topic or keywords of the videos (e.g., "sports" for sports-related videos).
-            Avoid including general terms like "videos," as the search is already scoped to video results.
+            query (string): A search query focusing on the topic or keywords of the videos (e.g., "sports" for sports-related videos). Avoid including general terms like "videos," as the search is already scoped to video results.
         """
         logger.info(f"Starting video search for: {query}")
         result = await self.search(query, categories="videos", limit=5)
@@ -201,8 +199,7 @@ class WebSearcherPro(Star):
         """Search the web for news
 
         Args:
-            query (string): A search query focusing on the topic or keywords of the news (e.g., "sports" for sports-related news).
-            Avoid including general terms like "news," as the search is already scoped to news articles.
+            query (string): A search query focusing on the topic or keywords of the news (e.g., "sports" for sports-related news). Avoid including general terms like "news," as the search is already scoped to news articles.
         """
         logger.info(f"Starting news search for: {query}")
         results = await self.search(query, categories="news")
@@ -215,8 +212,7 @@ class WebSearcherPro(Star):
         """Search the web for scientific information
 
         Args:
-            query (string): A search query focusing on the topic or keywords related to the scientific content (e.g., "quantum mechanics" for research on quantum mechanics).
-            Avoid including general terms like "scientific information," as the search is already scoped to scientific results.
+            query (string): A search query focusing on the topic or keywords related to the scientific content (e.g., "quantum mechanics" for research on quantum mechanics). Avoid including general terms like "scientific information," as the search is already scoped to scientific results.
         """
         logger.info(f"Starting science search for: {query}")
         results = await self.search(query, categories="science")
@@ -229,8 +225,7 @@ class WebSearcherPro(Star):
         """Search the web for music-related information
 
         Args:
-            query (string): A search query focusing on the topic or keywords related to music (e.g., "classical composers" for content about classical music).
-            Avoid including general terms like "music," as the search is already scoped to music-related results.
+            query (string): A search query focusing on the topic or keywords related to music (e.g., "classical composers" for content about classical music). Avoid including general terms like "music," as the search is already scoped to music-related results.
         """
         logger.info(f"Starting music search for: {query}")
         results = await self.search(query, categories="music")
@@ -243,8 +238,7 @@ class WebSearcherPro(Star):
         """Search the web for technical information
 
         Args:
-            query (string): A search query focusing on specific technical topics or keywords (e.g., "REST API design" for information about API design).
-            Avoid including general terms like "technical details," as the search is already scoped to technical content.
+            query (string): A search query focusing on specific technical topics or keywords (e.g., "REST API design" for information about API design). Avoid including general terms like "technical details," as the search is already scoped to technical content.
         """
 
         logger.info(f"Starting technical search for: {query}")
@@ -258,8 +252,7 @@ class WebSearcherPro(Star):
         """Search the web for academic information
 
         Args:
-            query (string): A search query focusing on specific academic topics, keywords, or fields of study (e.g., "machine learning papers" for research on machine learning).
-            Avoid including general terms like "academic content," as the search is already tailored for academic results.
+            query (string): A search query focusing on specific academic topics, keywords, or fields of study (e.g., "machine learning papers" for research on machine learning). Avoid including general terms like "academic content," as the search is already tailored for academic results.
         """
         logger.info(f"Starting academic search for: {query}")
         results = await self.search(query, categories="academic")
