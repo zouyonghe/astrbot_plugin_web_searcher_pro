@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from getpass import fallback_getpass
 from typing import Optional, Dict
 
 import aiohttp
@@ -147,13 +148,16 @@ class WebSearcherPro(Star):
         logger.info(f"Starting image search for: {query}")
         result = await self.search(query, categories="images")
         if result and result.results:
-            yield event.image_result(result.results[0].img_src)
-
-        chain = [
-            Image.fromURL(result.results[0].img_src),
-            Plain(f"{result.results[0].title}")
-        ]
-        yield event.chain_result(chain)
+            if self.config.get("enable_image_title", False):
+                chain = [
+                    Image.fromURL(result.results[0].img_src),
+                    Plain(f"{result.results[0].title}")
+                ]
+                yield event.chain_result(chain)
+            else:
+                yield event.image_result(result.results[0].img_src)
+        else:
+            yield event.plain_result("没有找到图片，请稍后再试。")
 
     @llm_tool("web_search_videos")
     async def search_videos(self, event: AstrMessageEvent, query: str):
