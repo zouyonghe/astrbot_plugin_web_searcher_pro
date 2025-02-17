@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 from typing import Optional, Dict
@@ -11,6 +10,7 @@ from astrbot.api import *
 from astrbot.api.event import AstrMessageEvent
 from astrbot.api.event.filter import *
 from astrbot.api.star import Context, Star, register
+from astrbot.core.message.components import Image, Plain
 from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
 
 logger = logging.getLogger("astrbot")
@@ -21,7 +21,7 @@ image_llm_prefix = "The images have been sent to the user. Below is the descript
 # 用于跟踪每个用户的状态，记录用户请求的时间和状态
 USER_STATES: Dict[str, Dict[str, float]] = {}
 
-@register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.0",
+@register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.1",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
 class WebSearcherPro(Star):
     def __init__(self, context: Context, config: dict):
@@ -84,40 +84,6 @@ class WebSearcherPro(Star):
             logger.error(f"JSON parsing error: {e}")
         except Exception as e:
             logger.error(f"Unexpected error during search: {e}")
-        
-    async def _generate_response(self, event: AstrMessageEvent, result: SearchResult):
-        provider = self.context.get_using_provider()
-        if provider:
-
-            succeed_prompt = (
-                f"你已经依据用户的请求`{event.get_message_str()}`发起了Web搜索的函数调用，"
-                f"以下是函数调用返回的结果，"
-                f"如果搜索的内容是图片，那么图片已被发送给用户，"
-                f"请根据下述信息，基于你的角色以合适的语气、称呼等，生成符合人设的图片介绍。\n\n"
-                f"信息：{str(result)}"
-            )
-
-            failed_prompt = (
-                f"你已经依据用户的请求`{event.get_message_str()}`发起了Web搜索的函数调用，"
-                f"但是没有搜索到请求结果，基于你的角色以合适的语气、称呼等，回复用户。"
-            )
-            if not result or not result.results:
-                prompt = failed_prompt
-            else:
-                prompt = succeed_prompt
-
-            conversation_id = await self.context.conversation_manager.get_curr_conversation_id(event.unified_msg_origin)
-            conversation = await self.context.conversation_manager.get_conversation(event.unified_msg_origin,
-                                                                                    conversation_id)
-            yield event.request_llm(
-                prompt=prompt,
-                func_tool_manager=None,
-                session_id=event.session_id,
-                contexts=[],  # json.loads(conversation.history)  不提供历史对话
-                system_prompt=self.context.provider_manager.selected_default_persona.get("prompt", ""),
-                image_urls=[],
-                conversation=conversation,
-            )
 
     @command("websearch")
     async def websearch(self, event: AstrMessageEvent, operation: str = None):
@@ -182,12 +148,12 @@ class WebSearcherPro(Star):
         result = await self.search(query, categories="images")
         if result and result.results:
             yield event.image_result(result.results[0].img_src)
-        try:
-            async for r in self._generate_response(event, result):
-                yield r
-        except Exception as e:
-            logger.error(f"调用 generate_response 时出错: {e}")
-            yield event.plain_result("❌ 生成回复时失败，请查看控制台日志")
+
+        chain = [
+            Image.fromURL(result.results[0].img_src),
+            Plain(f"{result.results[0].title}")
+        ]
+        yield event.chain_result(chain)
 
     @llm_tool("web_search_videos")
     async def search_videos(self, event: AstrMessageEvent, query: str):
