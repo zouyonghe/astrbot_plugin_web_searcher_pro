@@ -247,7 +247,7 @@ class WebSearcherPro(Star):
         """
         logger.info(f"Searching AUR packages for: {query}")
         aur_api_url = "https://aur.archlinux.org/rpc/v5/search"
-        params = {"arg": query, "by": "name-desc"}
+        params = {"arg": query, "by": "name"}
 
         if len(query) < 2:
             return "Search query must be at least 2 characters long."
