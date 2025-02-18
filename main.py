@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import random
 from typing import Optional, Dict
 
 import aiohttp
@@ -147,6 +148,7 @@ class WebSearcherPro(Star):
         logger.info(f"Starting image search for: {query}")
         result = await self.search(query, categories="images")
         if result and result.results:
+            result.results = random.choice(result.results)
             if self.config.get("enable_image_title", False):
                 chain = [
                     Image.fromURL(result.results[0].img_src),
@@ -332,25 +334,25 @@ async def _is_validate_image_url(img_url) -> bool:
 
 async def result_filter(result: SearchResult, categories: str, limit: int) -> Optional[SearchResult]:
     if categories == "images":
-        result.results = result.results[:20]
+        result.results = result.results[:50]
         urls = [item.img_src for item in result.results if item.img_src]
         validation_results = await asyncio.gather(*[_is_validate_image_url(url) for url in urls])
         result.results = [
             item for item, is_valid in zip(result.results, validation_results) if is_valid
         ]
-        result = find_highest_resolution_image(result)
+        result = find_highest_resolution_image(result, 20)
     else:
         result.results = result.results[:limit]
     return result
 
-def find_highest_resolution_image(result: SearchResult) -> SearchResult:
+def find_highest_resolution_image(result: SearchResult, limit: int) -> SearchResult:
     """
     从 SearchResult 中找到分辨率最高的图片。
     :param result: SearchResult 实例，包含多个 SearchResultItem。
+    :param limit: 返回分辨率最高的前limit张图片
     :return: 分辨率最高的 SearchResultItem，如果没有有效的分辨率则返回 None。
     """
-    max_item = None
-    max_area = 0
+    resolution_items = []
 
     for item in result:
         # 提取 resolution 字段，并解析成宽度和高度
@@ -359,14 +361,26 @@ def find_highest_resolution_image(result: SearchResult) -> SearchResult:
                 width, height = map(int, item.resolution.lower().replace('x', '×').split('×'))
                 area = width * height
 
-                # 如果当前图片的面积更大，则更新最大值
-                if area > max_area:
-                    max_area = area
-                    max_item = item
+                # 将 (面积, 图片对象) 添加到列表
+                resolution_items.append((area, item))
+
             except ValueError:
                 # 如果分辨率解析失败，则跳过
                 continue
-    result.results = [max_item]
+
+    # 按面积从大到小排序
+    resolution_items.sort(key=lambda x: x[0], reverse=True)
+
+    # 取出分辨率最高的十张图片
+    top_items = [item for _, item in resolution_items[:limit]]
+
+    # 如果没有足够的图片，直接返回空结果
+    if not top_items:
+        result.results = []
+        return result
+
+    result.results = top_items
     return result
+
 
 
