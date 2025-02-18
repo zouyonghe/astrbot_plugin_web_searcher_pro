@@ -264,10 +264,12 @@ class WebSearcherPro(Star):
                     if data.get("type") == "error":
                         logger.error(f"AUR API responded with an error: {data.get('error')}.")
                         yield event.plain_result(f"AUR search error: {data.get('error')}")
+                        return
 
                     results = data.get("results", [])
                     if not results:
                         yield event.plain_result(f"No AUR packages found for query: {query}")
+                        return
 
                     # 精准匹配逻辑
                     exact_match = next((pkg for pkg in results if pkg.get("Name") == query), None)
@@ -282,18 +284,18 @@ class WebSearcherPro(Star):
                             f"Popularity: {exact_match.get('Popularity')}\n"
                             f"Last Updated: {exact_match.get('LastModified')}"
                         )
+                        return
 
                     formatted_results = "\n".join(
                         [f"{item.get('Name')} - {item.get('Description')} (Votes: {item.get('NumVotes')})"
                          for item in results[:10]]
                     )
                     yield event.plain_result(formatted_results)
+                    return
         except aiohttp.ClientError as e:
             logger.error(f"HTTP client error during AUR search: {e}")
-            return
         except Exception as e:
             logger.error(f"Unexpected error during AUR search: {e}")
-            return
 
     @llm_tool("fetch_url")
     async def fetch_website_content(self, event: AstrMessageEvent, url: str) -> str:
