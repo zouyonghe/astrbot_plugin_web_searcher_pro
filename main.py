@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-from getpass import fallback_getpass
 from typing import Optional, Dict
 
 import aiohttp
@@ -239,7 +238,60 @@ class WebSearcherPro(Star):
             return "No academic information found for your query."
         return str(results)
 
+    @llm_tool("web_search_aur")
+    async def search_aur(self, event: AstrMessageEvent, query: str) -> str:
+        """Search packages from the Arch User Repository (AUR).
+    
+        Args:
+            query (string): The package name or keywords to search for in the AUR.
+        """
+        logger.info(f"Searching AUR packages for: {query}")
+        aur_api_url = "https://aur.archlinux.org/rpc/v5/search"
+        params = {"arg": query, "by": "name-desc"}
 
+        if len(query) < 2:
+            return "Search query must be at least 2 characters long."
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(aur_api_url, params=params) as response:
+                    if response.status != 200:
+                        logger.error(f"AUR API request failed with status {response.status}.")
+                        return f"AUR search failed with status {response.status}."
+
+                    data = await response.json()
+                    if data.get("type") == "error":
+                        logger.error(f"AUR API responded with an error: {data.get('error')}.")
+                        return f"AUR search error: {data.get('error')}"
+
+                    results = data.get("results", [])
+                    if not results:
+                        return f"No AUR packages found for query: {query}"
+
+                    # 如果只有一个结果，则显示详细信息
+                    if len(results) == 1:
+                        package = results[0]
+                        return (
+                            f"**Package Details**\n"
+                            f"Name: {package.get('Name')}\n"
+                            f"Description: {package.get('Description')}\n"
+                            f"Maintainer: {package.get('Maintainer') or 'N/A'}\n"
+                            f"Votes: {package.get('NumVotes')}\n"
+                            f"Popularity: {package.get('Popularity')}\n"
+                            f"Last Updated: {package.get('LastModified')}"
+                        )
+
+                    formatted_results = "\n".join(
+                        [f"{item.get('Name')} - {item.get('Description')} (Votes: {item.get('NumVotes')})"
+                         for item in results[:5]]
+                    )
+                    return formatted_results
+        except aiohttp.ClientError as e:
+            logger.error(f"HTTP client error during AUR search: {e}")
+            return "AUR search failed due to a network error."
+        except Exception as e:
+            logger.error(f"Unexpected error during AUR search: {e}")
+            return "AUR search encountered an unexpected error."
 
     @llm_tool("fetch_url")
     async def fetch_website_content(self, event: AstrMessageEvent, url: str) -> str:
