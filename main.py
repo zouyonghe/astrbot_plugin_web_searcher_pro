@@ -240,7 +240,7 @@ class WebSearcherPro(Star):
 
     @command("aur")
     @llm_tool("search_aur")
-    async def search_aur(self, event: AstrMessageEvent, query: str) -> str:
+    async def search_aur(self, event: AstrMessageEvent, query: str):
         """Search packages from the Arch User Repository (AUR).
     
         Args:
@@ -251,29 +251,30 @@ class WebSearcherPro(Star):
         params = {"arg": query, "by": "name"}
 
         if len(query) < 2:
-            return "Search query must be at least 2 characters long."
+            yield event.plain_result("Search query must be at least 2 characters long.")
 
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(aur_api_url, params=params) as response:
                     if response.status != 200:
                         logger.error(f"AUR API request failed with status {response.status}.")
-                        return f"AUR search failed with status {response.status}."
+                        yield event.plain_result(f"AUR search failed with status {response.status}.")
+                        return
 
                     data = await response.json()
                     if data.get("type") == "error":
                         logger.error(f"AUR API responded with an error: {data.get('error')}.")
-                        return f"AUR search error: {data.get('error')}"
+                        yield event.plain_result(f"AUR search error: {data.get('error')}")
 
                     results = data.get("results", [])
                     if not results:
-                        return f"No AUR packages found for query: {query}"
+                        yield event.plain_result(f"No AUR packages found for query: {query}")
 
                     # 精准匹配逻辑
                     exact_match = next((pkg for pkg in results if pkg.get("Name") == query), None)
                     if exact_match:
                         # 如果有精确匹配的包，则返回其详情
-                        return (
+                        yield event.plain_result (
                             f"**Package Details**\n"
                             f"Name: {exact_match.get('Name')}\n"
                             f"Description: {exact_match.get('Description')}\n"
@@ -287,13 +288,13 @@ class WebSearcherPro(Star):
                         [f"{item.get('Name')} - {item.get('Description')} (Votes: {item.get('NumVotes')})"
                          for item in results[:10]]
                     )
-                    return formatted_results
+                    yield event.plain_result(formatted_results)
         except aiohttp.ClientError as e:
             logger.error(f"HTTP client error during AUR search: {e}")
-            return "AUR search failed due to a network error."
+            return
         except Exception as e:
             logger.error(f"Unexpected error during AUR search: {e}")
-            return "AUR search encountered an unexpected error."
+            return
 
     @llm_tool("fetch_url")
     async def fetch_website_content(self, event: AstrMessageEvent, url: str) -> str:
