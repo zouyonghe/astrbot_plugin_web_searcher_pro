@@ -287,8 +287,8 @@ class WebSearcherPro(Star):
                         return
 
                     formatted_results = "\n".join(
-                        [f"{item.get('Name')} - {item.get('Description')} (Votes: {item.get('NumVotes')})"
-                         for item in results[:10]]
+                        [f"* {item.get('Name')} - {item.get('Description')} (Votes: {item.get('NumVotes')})"
+                         for item in results]
                     )
                     yield event.plain_result(formatted_results)
                     return
