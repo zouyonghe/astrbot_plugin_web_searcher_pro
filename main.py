@@ -238,7 +238,7 @@ class WebSearcherPro(Star):
             return "No academic information found for your query."
         return str(results)
 
-    @llm_tool("web_search_aur")
+    @llm_tool("search_aur")
     async def search_aur(self, event: AstrMessageEvent, query: str) -> str:
         """Search packages from the Arch User Repository (AUR).
     
