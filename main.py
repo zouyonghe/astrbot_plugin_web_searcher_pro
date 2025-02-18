@@ -271,6 +271,15 @@ class WebSearcherPro(Star):
                     # 如果只有一个结果，则显示详细信息
                     if len(results) == 1:
                         package = results[0]
+                        logger.error(
+                            f"**Package Details**\n"
+                            f"Name: {package.get('Name')}\n"
+                            f"Description: {package.get('Description')}\n"
+                            f"Maintainer: {package.get('Maintainer') or 'N/A'}\n"
+                            f"Votes: {package.get('NumVotes')}\n"
+                            f"Popularity: {package.get('Popularity')}\n"
+                            f"Last Updated: {package.get('LastModified')}"
+                        )
                         return (
                             f"**Package Details**\n"
                             f"Name: {package.get('Name')}\n"
