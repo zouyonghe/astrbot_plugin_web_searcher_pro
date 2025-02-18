@@ -239,7 +239,6 @@ class WebSearcherPro(Star):
         return str(results)
 
     @command("aur")
-    @llm_tool("search_aur")
     async def search_aur(self, event: AstrMessageEvent, query: str):
         """Search packages from the Arch User Repository (AUR).
     
