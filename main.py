@@ -268,31 +268,23 @@ class WebSearcherPro(Star):
                     if not results:
                         return f"No AUR packages found for query: {query}"
 
-                    # 如果只有一个结果，则显示详细信息
-                    if len(results) == 1:
-                        package = results[0]
-                        logger.error(
-                            f"**Package Details**\n"
-                            f"Name: {package.get('Name')}\n"
-                            f"Description: {package.get('Description')}\n"
-                            f"Maintainer: {package.get('Maintainer') or 'N/A'}\n"
-                            f"Votes: {package.get('NumVotes')}\n"
-                            f"Popularity: {package.get('Popularity')}\n"
-                            f"Last Updated: {package.get('LastModified')}"
-                        )
+                    # 精准匹配逻辑
+                    exact_match = next((pkg for pkg in results if pkg.get("Name") == query), None)
+                    if exact_match:
+                        # 如果有精确匹配的包，则返回其详情
                         return (
                             f"**Package Details**\n"
-                            f"Name: {package.get('Name')}\n"
-                            f"Description: {package.get('Description')}\n"
-                            f"Maintainer: {package.get('Maintainer') or 'N/A'}\n"
-                            f"Votes: {package.get('NumVotes')}\n"
-                            f"Popularity: {package.get('Popularity')}\n"
-                            f"Last Updated: {package.get('LastModified')}"
+                            f"Name: {exact_match.get('Name')}\n"
+                            f"Description: {exact_match.get('Description')}\n"
+                            f"Maintainer: {exact_match.get('Maintainer') or 'N/A'}\n"
+                            f"Votes: {exact_match.get('NumVotes')}\n"
+                            f"Popularity: {exact_match.get('Popularity')}\n"
+                            f"Last Updated: {exact_match.get('LastModified')}"
                         )
 
                     formatted_results = "\n".join(
                         [f"{item.get('Name')} - {item.get('Description')} (Votes: {item.get('NumVotes')})"
-                         for item in results[:5]]
+                         for item in results[:10]]
                     )
                     return formatted_results
         except aiohttp.ClientError as e:
