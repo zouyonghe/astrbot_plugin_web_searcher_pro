@@ -148,15 +148,15 @@ class WebSearcherPro(Star):
         logger.info(f"Starting image search for: {query}")
         result = await self.search(query, categories="images")
         if result and result.results:
-            result.results = random.choice(result.results)
+            selected_image = random.choice(result.results)
             if self.config.get("enable_image_title", False):
                 chain = [
-                    Image.fromURL(result.results[0].img_src),
-                    Plain(f"{result.results[0].title}")
+                    Image.fromURL(selected_image.img_src),
+                    Plain(f"{selected_image.title}")
                 ]
                 yield event.chain_result(chain)
             else:
-                yield event.image_result(result.results[0].img_src)
+                yield event.image_result(selected_image.img_src)
         else:
             yield event.plain_result("没有找到图片，请稍后再试。")
 
