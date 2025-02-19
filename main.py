@@ -328,9 +328,8 @@ class WebSearcherPro(Star):
             if exactly one repository is found, fetch detailed information, including README content.
     
             Args:
-                event (AstrMessageEvent): The event triggering this search.
                 query (str): The repository name or keywords for fuzzy search.
-    
+
             Returns:
                 str: Repository list or detailed information with README content.
             """
