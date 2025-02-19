@@ -331,68 +331,49 @@ class WebSearcherPro(Star):
         search_url = "https://api.github.com/search/repositories"
         headers = {}
 
-        # 获取 GitHub Token（可选）
+        # Optional: Use GitHub Token to increase API limits
         token = self.config.get("github_token", "").strip()
         if token:
             headers["Authorization"] = f"token {token}"
 
         try:
+            # Step 1: Check if query is a specific repository (owner/repo format)
+            if "/" in query:
+                exact_repo_url = f"https://api.github.com/repos/{query}"
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(exact_repo_url, headers=headers) as exact_response:
+                        if exact_response.status == 200:
+                            return await self._fetch_repo_details(session, exact_response, headers)
+                        elif exact_response.status == 404:
+                            # If exact match not found, fall back to fuzzy search
+                            pass
+                        else:
+                            return f"Error while fetching repository: HTTP Status {exact_response.status}."
+
+            # Step 2: Run fuzzy search if input is not "owner/repo" or exact match failed
+            search_url = "https://api.github.com/search/repositories"
+            params = {"q": query, "per_page": 5}  # Limit fuzzy search results to top 5
             async with aiohttp.ClientSession() as session:
-                # Fuzzy search repositories
-                params = {"q": query, "per_page": 5}  # Limit results to top 5
                 async with session.get(search_url, params=params, headers=headers) as search_response:
                     if search_response.status == 200:
                         search_data = await search_response.json()
                         items = search_data.get("items", [])
-
                         if not items:
                             return f"No repositories found for query: {query}"
 
+                        # If only one result, fetch its details
+                        if len(items) == 1:
+                            repo_url = items[0]["url"]
+                            async with session.get(repo_url, headers=headers) as exact_response:
+                                if exact_response.status == 200:
+                                    return await self._fetch_repo_details(session, exact_response, headers)
+
                         # If multiple results, return as a list
-                        if len(items) > 1:
-                            return "\n".join(
-                                [f"{i + 1}. **{item['full_name']}** - {item['description'] or 'No description'}"
-                                 for i, item in enumerate(items)]
-                            )
-
-                        # If only one repository is found, fetch details
-                        repo = items[0]
-                        repo_details_url = repo["url"]
-                        async with session.get(repo_details_url, headers=headers) as detail_response:
-                            if detail_response.status == 200:
-                                repo_data = await detail_response.json()
-                                details = (
-                                    f"**Repository Details**\n"
-                                    f"Name: {repo_data.get('name')}\n"
-                                    f"Full Name: {repo_data.get('full_name')}\n"
-                                    f"Description: {repo_data.get('description')}\n"
-                                    f"Stars: {repo_data.get('stargazers_count')}\n"
-                                    f"Forks: {repo_data.get('forks_count')}\n"
-                                    f"Language: {repo_data.get('language')}\n"
-                                    f"URL: {repo_data.get('html_url')}\n\n"
-                                )
-
-                                # Fetch README content
-                                readme_endpoint = repo_details_url + "/readme"
-                                async with session.get(readme_endpoint, headers=headers) as readme_response:
-                                    if readme_response.status == 200:
-                                        readme_data = await readme_response.json()
-                                        readme_content = base64.b64decode(readme_data["content"]).decode("utf-8")
-
-                                        details += "**README Content:**\n\n"
-                                        details += readme_content[:2000]  # Limit README to 2000 characters
-
-                                        logger.info(f"Successfully fetched README for {repo['full_name']}")
-                                        return details
-                                    elif readme_response.status == 404:
-                                        details += "This repository does not have a README file."
-                                        logger.info(f"No README found for {repo['full_name']}")
-                                        return details
-                                    else:
-                                        logger.error(f"Failed to fetch README - Status: {readme_response.status}")
-                                        return details + "Failed to fetch README content."
+                        return "\n".join(
+                            [f"{i + 1}. **{item['full_name']}** - {item['description'] or 'No description'}"
+                             for i, item in enumerate(items)]
+                        )
                     else:
-                        logger.error(f"GitHub search request failed - Status: {search_response.status}")
                         return f"GitHub search failed. HTTP Status: {search_response.status}"
 
         except aiohttp.ClientError as e:
@@ -401,6 +382,49 @@ class WebSearcherPro(Star):
         except Exception as e:
             logger.error(f"Unexpected error during GitHub search: {e}")
             return "An unexpected error occurred. Please try again later."
+
+    async def _fetch_repo_details(self, session, exact_response, headers):
+        """
+            Fetch repository details along with README content.
+
+            Args:
+                session: The active aiohttp session.
+                exact_response: The exact repository API response.
+                headers: Headers for subsequent requests.
+
+            Returns:
+                str: Detailed repository information (including README if available).
+            """
+        repo_data = await exact_response.json()
+        details = (
+            f"**Repository Details**\n"
+            f"Name: {repo_data.get('name')}\n"
+            f"Full Name: {repo_data.get('full_name')}\n"
+            f"Description: {repo_data.get('description')}\n"
+            f"Stars: {repo_data.get('stargazers_count')}\n"
+            f"Forks: {repo_data.get('forks_count')}\n"
+            f"Language: {repo_data.get('language')}\n"
+            f"URL: {repo_data.get('html_url')}\n\n"
+        )
+
+        # Fetch README content
+        readme_url = f"{repo_data['url']}/readme"
+        try:
+            async with session.get(readme_url, headers=headers) as readme_response:
+                if readme_response.status == 200:
+                    readme_data = await readme_response.json()
+                    readme_content = base64.b64decode(readme_data["content"]).decode("utf-8")
+                    details += "**README Content:**\n\n"
+                    details += readme_content[:2000]  # Limit README to 2000 characters
+                elif readme_response.status == 404:
+                    details += "This repository does not have a README file."
+                else:
+                    details += "Failed to fetch the README content."
+        except Exception as e:
+            logger.error(f"Error fetching README: {e}")
+            details += "An unexpected error occurred while fetching README content."
+
+        return details
 
     @command("github")
     async def github_search(self, event: AstrMessageEvent, query: str = None):
