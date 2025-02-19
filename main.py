@@ -326,7 +326,7 @@ class WebSearcherPro(Star):
         """Fuzzy search for GitHub repositories. If multiple repositories are found, display as a list; if exactly one repository is found, fetch detailed information, including README content.
 
         Args:
-            query (str): The repository name or keywords for fuzzy search.
+            query(string): The repository name or keywords for fuzzy search.
         """
         search_url = "https://api.github.com/search/repositories"
         headers = {}
