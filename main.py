@@ -76,7 +76,7 @@ class WebSearcherPro(Star):
                                 for item in data.get("results", [])
                             ]
                         )
-                        return await result_filter(result, categories, limit)
+                        return await self._result_filter(result, categories, limit)
                     else:
                         logger.error(f"Failed to search SearxNG. HTTP Status: {response.status}, Params: {params}")
                         return None
@@ -86,6 +86,68 @@ class WebSearcherPro(Star):
             logger.error(f"JSON parsing error: {e}")
         except Exception as e:
             logger.error(f"Unexpected error during search: {e}")
+
+    async def _result_filter(self, result: SearchResult, categories: str, limit: int) -> Optional[SearchResult]:
+        if categories == "images":
+            result.results = result.results[:50]
+            urls = [item.img_src for item in result.results if item.img_src]
+            validation_results = await asyncio.gather(*[self._is_validate_image_url(url) for url in urls])
+            result.results = [
+                item for item, is_valid in zip(result.results, validation_results) if is_valid
+            ]
+            result = self._find_highest_resolution_image(result, 20)
+        else:
+            result.results = result.results[:limit]
+        return result
+
+    async def _is_validate_image_url(self, img_url: str) -> bool:
+        if not img_url:
+            return False
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.head(img_url, timeout=2) as response:
+                    if response.status == 200 and "image" in response.headers.get("Content-Type", "").lower():
+                        return True
+        except Exception:
+            pass
+        return False
+
+    def _find_highest_resolution_image(self, result: SearchResult, limit: int) -> SearchResult:
+        """
+        从 SearchResult 中找到分辨率最高的图片。
+        :param result: SearchResult 实例，包含多个 SearchResultItem。
+        :param limit: 返回分辨率最高的前limit张图片
+        :return: 分辨率最高的 SearchResultItem，如果没有有效的分辨率则返回 None。
+        """
+        resolution_items = []
+
+        for item in result:
+            # 提取 resolution 字段，并解析成宽度和高度
+            if item.resolution:
+                try:
+                    width, height = map(int, item.resolution.lower().replace('x', '×').split('×'))
+                    area = width * height
+
+                    # 将 (面积, 图片对象) 添加到列表
+                    resolution_items.append((area, item))
+
+                except ValueError:
+                    # 如果分辨率解析失败，则跳过
+                    continue
+
+        # 按面积从大到小排序
+        resolution_items.sort(key=lambda x: x[0], reverse=True)
+
+        # 取出分辨率最高的十张图片
+        top_items = [item for _, item in resolution_items[:limit]]
+
+        # 如果没有足够的图片，直接返回空结果
+        if not top_items:
+            result.results = []
+            return result
+
+        result.results = top_items
+        return result
 
     @command("websearch")
     async def websearch(self, event: AstrMessageEvent, operation: str = None):
@@ -321,6 +383,49 @@ class WebSearcherPro(Star):
             logger.error(f"fetch_website_content 出现问题: {e}")
             return "Fetch URL failed, please try again later."
 
+    async def _fetch_repo_details(self, session, exact_response, headers):
+        """
+            Fetch repository details along with README content.
+
+            Args:
+                session: The active aiohttp session.
+                exact_response: The exact repository API response.
+                headers: Headers for subsequent requests.
+
+            Returns:
+                str: Detailed repository information (including README if available).
+            """
+        repo_data = await exact_response.json()
+        details = (
+            f"**Repository Details**\n"
+            f"Name: {repo_data.get('name')}\n"
+            f"Full Name: {repo_data.get('full_name')}\n"
+            f"Description: {repo_data.get('description')}\n"
+            f"Stars: {repo_data.get('stargazers_count')}\n"
+            f"Forks: {repo_data.get('forks_count')}\n"
+            f"Language: {repo_data.get('language')}\n"
+            f"URL: {repo_data.get('html_url')}\n\n"
+        )
+
+        # Fetch README content
+        readme_url = f"{repo_data['url']}/readme"
+        try:
+            async with session.get(readme_url, headers=headers) as readme_response:
+                if readme_response.status == 200:
+                    readme_data = await readme_response.json()
+                    readme_content = base64.b64decode(readme_data["content"]).decode("utf-8")
+                    details += "**README Content:**\n\n"
+                    details += readme_content[:2000]  # Limit README to 2000 characters
+                elif readme_response.status == 404:
+                    details += "This repository does not have a README file."
+                else:
+                    details += "Failed to fetch the README content."
+        except Exception as e:
+            logger.error(f"Error fetching README: {e}")
+            details += "An unexpected error occurred while fetching README content."
+
+        return details
+
     @llm_tool("github_search")
     async def search_github_repo(self, event: AstrMessageEvent, query: str) -> str:
         """Fuzzy search for GitHub repositories. If multiple repositories are found, display as a list; if exactly one repository is found, fetch detailed information, including README content.
@@ -383,58 +488,13 @@ class WebSearcherPro(Star):
             logger.error(f"Unexpected error during GitHub search: {e}")
             return "An unexpected error occurred. Please try again later."
 
-    async def _fetch_repo_details(self, session, exact_response, headers):
-        """
-            Fetch repository details along with README content.
-
-            Args:
-                session: The active aiohttp session.
-                exact_response: The exact repository API response.
-                headers: Headers for subsequent requests.
-
-            Returns:
-                str: Detailed repository information (including README if available).
-            """
-        repo_data = await exact_response.json()
-        details = (
-            f"**Repository Details**\n"
-            f"Name: {repo_data.get('name')}\n"
-            f"Full Name: {repo_data.get('full_name')}\n"
-            f"Description: {repo_data.get('description')}\n"
-            f"Stars: {repo_data.get('stargazers_count')}\n"
-            f"Forks: {repo_data.get('forks_count')}\n"
-            f"Language: {repo_data.get('language')}\n"
-            f"URL: {repo_data.get('html_url')}\n\n"
-        )
-
-        # Fetch README content
-        readme_url = f"{repo_data['url']}/readme"
-        try:
-            async with session.get(readme_url, headers=headers) as readme_response:
-                if readme_response.status == 200:
-                    readme_data = await readme_response.json()
-                    readme_content = base64.b64decode(readme_data["content"]).decode("utf-8")
-                    details += "**README Content:**\n\n"
-                    details += readme_content[:2000]  # Limit README to 2000 characters
-                elif readme_response.status == 404:
-                    details += "This repository does not have a README file."
-                else:
-                    details += "Failed to fetch the README content."
-        except Exception as e:
-            logger.error(f"Error fetching README: {e}")
-            details += "An unexpected error occurred while fetching README content."
-
-        return details
-
     @command("github")
     async def github_search(self, event: AstrMessageEvent, query: str = None):
-        """
-            Command to search GitHub repositories. Supports fuzzy search and details fetching.
+        """Command to search GitHub repositories. Supports fuzzy search and details fetching.
     
-            Args:
-                event (AstrMessageEvent): The command event.
-                query (str): The repository name or keywords for fuzzy search.
-            """
+        Args:
+            query (str): The repository name or keywords for fuzzy search.
+        """
         if not query:
             yield event.plain_result("Please provide a repository name or search keywords.")
             return
@@ -442,69 +502,5 @@ class WebSearcherPro(Star):
         logger.info(f"Received GitHub search query: {query}")
         result = await self.search_github_repo(event, query)
         yield event.plain_result(result)
-
-
-async def _is_validate_image_url(img_url) -> bool:
-    if not img_url:
-        return False
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.head(img_url, timeout=2) as response:
-                if response.status == 200 and "image" in response.headers.get("Content-Type", "").lower():
-                    return True
-    except Exception:
-        pass
-    return False
-
-async def result_filter(result: SearchResult, categories: str, limit: int) -> Optional[SearchResult]:
-    if categories == "images":
-        result.results = result.results[:50]
-        urls = [item.img_src for item in result.results if item.img_src]
-        validation_results = await asyncio.gather(*[_is_validate_image_url(url) for url in urls])
-        result.results = [
-            item for item, is_valid in zip(result.results, validation_results) if is_valid
-        ]
-        result = find_highest_resolution_image(result, 20)
-    else:
-        result.results = result.results[:limit]
-    return result
-
-def find_highest_resolution_image(result: SearchResult, limit: int) -> SearchResult:
-    """
-    从 SearchResult 中找到分辨率最高的图片。
-    :param result: SearchResult 实例，包含多个 SearchResultItem。
-    :param limit: 返回分辨率最高的前limit张图片
-    :return: 分辨率最高的 SearchResultItem，如果没有有效的分辨率则返回 None。
-    """
-    resolution_items = []
-
-    for item in result:
-        # 提取 resolution 字段，并解析成宽度和高度
-        if item.resolution:
-            try:
-                width, height = map(int, item.resolution.lower().replace('x', '×').split('×'))
-                area = width * height
-
-                # 将 (面积, 图片对象) 添加到列表
-                resolution_items.append((area, item))
-
-            except ValueError:
-                # 如果分辨率解析失败，则跳过
-                continue
-
-    # 按面积从大到小排序
-    resolution_items.sort(key=lambda x: x[0], reverse=True)
-
-    # 取出分辨率最高的十张图片
-    top_items = [item for _, item in resolution_items[:limit]]
-
-    # 如果没有足够的图片，直接返回空结果
-    if not top_items:
-        result.results = []
-        return result
-
-    result.results = top_items
-    return result
-
 
 
