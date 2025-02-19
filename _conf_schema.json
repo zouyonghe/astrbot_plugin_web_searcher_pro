@@ -9,5 +9,11 @@
         "type": "bool",
         "description": "开启图片标题",
         "default": true
+    },
+    "github_token": {
+        "type": "string",
+        "description": "GitHub token",
+        "default": "",
+        "hint": "https://github.com/settings/personal-access-tokens"
     }
 }

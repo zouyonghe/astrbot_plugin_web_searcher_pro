@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import logging
 import os
 import random
@@ -319,6 +320,111 @@ class WebSearcherPro(Star):
         except Exception as e:
             logger.error(f"fetch_website_content 出现问题: {e}")
             return "Fetch URL failed, please try again later."
+
+    @llm_tool("github_search")
+    async def search_github_repo(self, event: AstrMessageEvent, query: str) -> str:
+        """
+            Fuzzy search for GitHub repositories. If multiple repositories are found, display as a list;
+            if exactly one repository is found, fetch detailed information, including README content.
+    
+            Args:
+                event (AstrMessageEvent): The event triggering this search.
+                query (str): The repository name or keywords for fuzzy search.
+    
+            Returns:
+                str: Repository list or detailed information with README content.
+            """
+        search_url = "https://api.github.com/search/repositories"
+        headers = {}
+
+        # 获取 GitHub Token（可选）
+        token = self.config.get("github_token", "").strip()
+        if token:
+            headers["Authorization"] = f"token {token}"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Fuzzy search repositories
+                params = {"q": query, "per_page": 5}  # Limit results to top 5
+                async with session.get(search_url, params=params, headers=headers) as search_response:
+                    if search_response.status == 200:
+                        search_data = await search_response.json()
+                        items = search_data.get("items", [])
+
+                        if not items:
+                            return f"No repositories found for query: {query}"
+
+                        # If multiple results, return as a list
+                        if len(items) > 1:
+                            return "\n".join(
+                                [f"{i + 1}. **{item['full_name']}** - {item['description'] or 'No description'}"
+                                 for i, item in enumerate(items)]
+                            )
+
+                        # If only one repository is found, fetch details
+                        repo = items[0]
+                        repo_details_url = repo["url"]
+                        async with session.get(repo_details_url, headers=headers) as detail_response:
+                            if detail_response.status == 200:
+                                repo_data = await detail_response.json()
+                                details = (
+                                    f"**Repository Details**\n"
+                                    f"Name: {repo_data.get('name')}\n"
+                                    f"Full Name: {repo_data.get('full_name')}\n"
+                                    f"Description: {repo_data.get('description')}\n"
+                                    f"Stars: {repo_data.get('stargazers_count')}\n"
+                                    f"Forks: {repo_data.get('forks_count')}\n"
+                                    f"Language: {repo_data.get('language')}\n"
+                                    f"URL: {repo_data.get('html_url')}\n\n"
+                                )
+
+                                # Fetch README content
+                                readme_endpoint = repo_details_url + "/readme"
+                                async with session.get(readme_endpoint, headers=headers) as readme_response:
+                                    if readme_response.status == 200:
+                                        readme_data = await readme_response.json()
+                                        readme_content = base64.b64decode(readme_data["content"]).decode("utf-8")
+
+                                        details += "**README Content:**\n\n"
+                                        details += readme_content[:2000]  # Limit README to 2000 characters
+
+                                        logger.info(f"Successfully fetched README for {repo['full_name']}")
+                                        return details
+                                    elif readme_response.status == 404:
+                                        details += "This repository does not have a README file."
+                                        logger.info(f"No README found for {repo['full_name']}")
+                                        return details
+                                    else:
+                                        logger.error(f"Failed to fetch README - Status: {readme_response.status}")
+                                        return details + "Failed to fetch README content."
+                    else:
+                        logger.error(f"GitHub search request failed - Status: {search_response.status}")
+                        return f"GitHub search failed. HTTP Status: {search_response.status}"
+
+        except aiohttp.ClientError as e:
+            logger.error(f"HTTP client error during GitHub search: {e}")
+            return "An error occurred while fetching repository information. Please try again later."
+        except Exception as e:
+            logger.error(f"Unexpected error during GitHub search: {e}")
+            return "An unexpected error occurred. Please try again later."
+
+    @command("github")
+    async def github_search(self, event: AstrMessageEvent, query: str = None):
+        """
+            Command to search GitHub repositories. Supports fuzzy search and details fetching.
+    
+            Args:
+                event (AstrMessageEvent): The command event.
+                query (str): The repository name or keywords for fuzzy search.
+            """
+        if not query:
+            yield event.plain_result("Please provide a repository name or search keywords.")
+            return
+
+        logger.info(f"Received GitHub search query: {query}")
+        result = await self.search_github_repo(event, query)
+        yield event.plain_result(result)
+
 
 async def _is_validate_image_url(img_url) -> bool:
     if not img_url:
