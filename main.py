@@ -415,7 +415,7 @@ class WebSearcherPro(Star):
                     readme_data = await readme_response.json()
                     readme_content = base64.b64decode(readme_data["content"]).decode("utf-8")
                     details += "**README Content:**\n\n"
-                    details += readme_content[:2000]  # Limit README to 2000 characters
+                    details += readme_content[:4000]  # Limit README to 4000 characters
                 elif readme_response.status == 404:
                     details += "This repository does not have a README file."
                 else:
