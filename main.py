@@ -324,10 +324,10 @@ class WebSearcherPro(Star):
     @llm_tool("github_search")
     async def search_github_repo(self, event: AstrMessageEvent, query: str) -> str:
         """Fuzzy search for GitHub repositories. If multiple repositories are found, display as a list; if exactly one repository is found, fetch detailed information, including README content.
-    
-            Args:
-                query (str): The repository name or keywords for fuzzy search.
-            """
+
+        Args:
+            query (str): The repository name or keywords for fuzzy search.
+        """
         search_url = "https://api.github.com/search/repositories"
         headers = {}
 
