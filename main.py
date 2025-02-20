@@ -1,9 +1,8 @@
 import asyncio
 import base64
-import logging
 import os
 import random
-from typing import Optional, Dict
+from typing import Optional
 
 import aiohttp
 from readability import Document
@@ -15,13 +14,6 @@ from astrbot.api.star import Context, Star, register
 from astrbot.core.message.components import Image, Plain
 from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
 
-logger = logging.getLogger("astrbot")
-temp_path = "./temp"
-
-image_llm_prefix = "The images have been sent to the user. Below is the description of the images:\n"
-
-# 用于跟踪每个用户的状态，记录用户请求的时间和状态
-USER_STATES: Dict[str, Dict[str, float]] = {}
 
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.1",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
