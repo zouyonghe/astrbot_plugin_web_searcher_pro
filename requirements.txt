@@ -1,2 +1,2 @@
-aiohttp==3.11.12
-readability-lxml==0.8.1
+aiohttp
+readability-lxml
