@@ -364,7 +364,7 @@ class WebSearcherPro(Star):
 
     @llm_tool("fetch_url")
     async def fetch_website_content(self, event: AstrMessageEvent, url: str) -> str:
-        """Fetch the content of a website using the provided URL.
+        """Fetch the content of a website using the provided URL.This function must not be used to download e-books.
         When to use:
             1. A user requests the content or summary of a particular website via a query or message.
             2. You need to programmatically retrieve and parse the HTML content of a webpage.
