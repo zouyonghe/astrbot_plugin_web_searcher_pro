@@ -16,7 +16,7 @@
 
 # 配置
 
-可参考 https://docs.openwebui.com/tutorials/web_search/ 部署SearXNG
+可参考 https://docs.openwebui.com/tutorials/web-search/searxng 部署SearXNG
 
 # 支持
 
