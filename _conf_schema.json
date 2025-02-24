@@ -5,6 +5,12 @@
         "default": "http://127.0.0.1:8080",
         "hint": "需要包含http://或https://前缀"
     },
+    "enable_random_image": {
+        "type": "bool",
+        "description": "开启随机图片",
+        "default": false,
+        "hint": "如果开启则只显示结果中一张随机图片，关闭则显示结果中前20张图片"
+    },
     "enable_image_title": {
         "type": "bool",
         "description": "开启图片标题",

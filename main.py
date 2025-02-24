@@ -12,7 +12,7 @@ from astrbot.api import *
 from astrbot.api.event import AstrMessageEvent
 from astrbot.api.event.filter import *
 from astrbot.api.star import Context, Star, register
-from astrbot.core.message.components import Image, Plain
+from astrbot.core.message.components import Image, Plain, Nodes, Node
 from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
 
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.1",
@@ -203,15 +203,29 @@ class WebSearcherPro(Star):
         logger.info(f"Starting image search for: {query}")
         result = await self.search(query, categories="images")
         if result and result.results:
-            selected_image = random.choice(result.results)
-            if self.config.get("enable_image_title", False):
-                chain = [
-                    Image.fromURL(selected_image.img_src),
-                    Plain(f"{selected_image.title}")
-                ]
-                yield event.chain_result(chain)
-            else:
-                yield event.image_result(selected_image.img_src)
+            # selected_image = random.choice(result.results)
+            # if self.config.get("enable_image_title", False):
+            #     chain = [
+            #         Image.fromURL(selected_image.img_src),
+            #         Plain(f"{selected_image.title}")
+            #     ]
+            #     yield event.chain_result(chain)
+            # else:
+            #     yield event.image_result(selected_image.img_src)
+            ns = Nodes([])
+            for idx, item in enumerate(result.results):
+                if self.config.get("enable_image_title", False):
+                    chain = [Plain(f"{item.title}"), Image.fromURL(item.img_src)]
+                else:
+                    chain = [Image.fromURL(item.img_src)]
+
+                node = Node(
+                    uin=event.get_self_id(),
+                    name="IMAGE",
+                    content=chain
+                )
+                ns.nodes.append(node)
+            yield event.chain_result([ns])
         else:
             yield event.plain_result("没有找到图片，请稍后再试。")
 
