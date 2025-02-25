@@ -441,11 +441,13 @@ class WebSearcherPro(Star):
 
     @llm_tool("github_search")
     async def search_github_repo(self, event: AstrMessageEvent, query: str) -> str:
-        """Fuzzy search for GitHub repositories. If multiple repositories are found, display as a list; if exactly one repository is found, fetch detailed information, including README content.
+        """同时支持直接处理 GitHub 仓库 URL 和生成克隆仓库链接的搜索逻辑。
 
         Args:
-            query(string): The repository name or keywords for fuzzy search.
+            query (string): 可以是 "owner/repo" 格式的仓库名，关键词，GitHub 仓库 URL，或克隆地址格式。
         """
+        import re
+
         search_url = "https://api.github.com/search/repositories"
         headers = {}
 
@@ -455,22 +457,35 @@ class WebSearcherPro(Star):
             headers["Authorization"] = f"token {token}"
 
         try:
-            # Step 1: Check if query is a specific repository (owner/repo format)
-            if "/" in query:
+            # Step 1: 解析输入，检查是否是 GitHub URL 或 "git clone" 格式
+            clone_url_pattern = re.compile(r"^(?:git@github\.com:|https://github\.com/)([\w\-]+/[\w\-]+)(?:\.git)?$")
+            match = clone_url_pattern.match(query)
+            if match:
+                repo_path = match.group(1)  # 提取 "owner/repo"
+                exact_repo_url = f"https://api.github.com/repos/{repo_path}"
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(exact_repo_url, headers=headers) as exact_response:
+                        if exact_response.status == 200:
+                            return await self._fetch_repo_details(session, exact_response, headers)
+                        elif exact_response.status == 404:
+                            return f"Repository '{repo_path}' not found."
+                        else:
+                            return f"Error while fetching repository: HTTP Status {exact_response.status}."
+
+            # Step 2: 检查是否是 "owner/repo" 格式
+            if "/" in query and not query.startswith("http"):
                 exact_repo_url = f"https://api.github.com/repos/{query}"
                 async with aiohttp.ClientSession() as session:
                     async with session.get(exact_repo_url, headers=headers) as exact_response:
                         if exact_response.status == 200:
                             return await self._fetch_repo_details(session, exact_response, headers)
                         elif exact_response.status == 404:
-                            # If exact match not found, fall back to fuzzy search
-                            pass
+                            pass  # 如果未找到精确匹配，则降级到模糊搜索
                         else:
                             return f"Error while fetching repository: HTTP Status {exact_response.status}."
 
-            # Step 2: Run fuzzy search if input is not "owner/repo" or exact match failed
-            search_url = "https://api.github.com/search/repositories"
-            params = {"q": query, "per_page": 5}  # Limit fuzzy search results to top 5
+            # Step 3: 如果不是特定格式，则执行模糊搜索
+            params = {"q": query, "per_page": 5}  # 限制模糊搜索结果为 5 个
             async with aiohttp.ClientSession() as session:
                 async with session.get(search_url, params=params, headers=headers) as search_response:
                     if search_response.status == 200:
@@ -479,16 +494,17 @@ class WebSearcherPro(Star):
                         if not items:
                             return f"No repositories found for query: {query}"
 
-                        # If only one result, fetch its details
+                        # 如果只有一个结果，则继续获取详细信息
                         if len(items) == 1:
                             repo_url = items[0]["url"]
                             async with session.get(repo_url, headers=headers) as exact_response:
                                 if exact_response.status == 200:
                                     return await self._fetch_repo_details(session, exact_response, headers)
 
-                        # If multiple results, return as a list
+                        # 有多个结果，则以列表形式返回
                         return "\n".join(
                             [f"{i + 1}. **{item['full_name']}** - {item['description'] or 'No description'}"
+                             f"  \nClone URL: {item['clone_url']}"
                              for i, item in enumerate(items)]
                         )
                     else:
@@ -503,17 +519,16 @@ class WebSearcherPro(Star):
 
     @command("github")
     async def github_search(self, event: AstrMessageEvent, query: str = None):
-        """Command to search GitHub repositories. Supports fuzzy search and details fetching.
-    
+        """GitHub 仓库搜索命令，支持模糊搜索及详细信息查询。
+
         Args:
-            query (str): The repository name or keywords for fuzzy search.
+            query (str): 可以是完整 GitHub URL，"git clone" 格式，"owner/repo" 格式的仓库名，或关键词。
         """
         if not query:
-            yield event.plain_result("Please provide a repository name or search keywords.")
+            yield event.plain_result("Please provide a repository name, URL, or search keywords.")
             return
 
         logger.info(f"Received GitHub search query: {query}")
         result = await self.search_github_repo(event, query)
         yield event.plain_result(result)
-
 
