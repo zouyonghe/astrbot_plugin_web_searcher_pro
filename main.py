@@ -196,6 +196,7 @@ class WebSearcherPro(Star):
     @llm_tool("web_search_images")
     async def search_images(self, event: AstrMessageEvent, query: str):
         """Search the web for images
+        This function should be used when searching for existing images on the web based on a given query.
 
         Args:
             query (string): A search query focusing on the topic or keywords of the images (e.g., "nature" for nature-related images). Avoid including general terms like "images," as the search is already scoped to image results.
