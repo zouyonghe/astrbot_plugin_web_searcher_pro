@@ -3,7 +3,9 @@ import base64
 import json
 import os
 import random
+import re
 from typing import Optional
+from urllib.parse import urlparse
 
 import aiohttp
 from readability import Document
@@ -384,6 +386,23 @@ class WebSearcherPro(Star):
         """
         logger.info(f"正在通过 fetch_website_content 拉取数据: {url}")
         try:
+            parsed_url = urlparse(url)
+            if "github.com" in parsed_url.netloc:
+                logger.info(f"检测到 GitHub 链接：{url}")
+
+                # 提取 GitHub 链接的路径
+                github_path_pattern = re.compile(r"^/([\w\-]+/[\w\-]+)")  # 匹配 owner/repo
+                match = github_path_pattern.match(parsed_url.path)
+                if match:
+                    repo_path = match.group(1)
+                    logger.debug(f"提取到 GitHub 仓库路径：{repo_path}")
+
+                    # 调用 GitHub 搜索方法，处理仓库分析逻辑
+                    return await self.search_github_repo(event, repo_path)
+
+                # 如果不是仓库路径，返回错误提示
+                return "The provided GitHub link is not a valid repository link."
+
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if response.status != 200:
@@ -441,12 +460,13 @@ class WebSearcherPro(Star):
 
     @llm_tool("github_search")
     async def search_github_repo(self, event: AstrMessageEvent, query: str) -> str:
-        """同时支持直接处理 GitHub 仓库 URL 和生成克隆仓库链接的搜索逻辑。
+        """用于搜索GitHub仓库，支持直接搜索 GitHub 仓库 URL、克隆链接，以及仓库名称的模糊搜索。
 
         Args:
-            query (string): 可以是 "owner/repo" 格式的仓库名，关键词，GitHub 仓库 URL，或克隆地址格式。
+            query (string): 可以是 "owner/repo" 格式的仓库名，关键词，GitHub 仓库(URL)，或克隆地址格式。
         """
         import re
+        from urllib.parse import urlparse
 
         search_url = "https://api.github.com/search/repositories"
         headers = {}
@@ -457,11 +477,30 @@ class WebSearcherPro(Star):
             headers["Authorization"] = f"token {token}"
 
         try:
-            # Step 1: 解析输入，检查是否是 GitHub URL 或 "git clone" 格式
+            # Step 1: 解析输入，检查是否是 GitHub URL，克隆链接，或特定目录路径
+            url_pattern = re.compile(r"^https://github\.com/([\w\-]+/[\w\-]+)")  # 匹配 `https://github.com/owner/repo`
             clone_url_pattern = re.compile(r"^(?:git@github\.com:|https://github\.com/)([\w\-]+/[\w\-]+)(?:\.git)?$")
+
+            # 检查是否是完整 GitHub URL (支持 /tree/ 分支/目录等)
+            if url_pattern.match(query):
+                parsed_url = urlparse(query)
+                match = url_pattern.match(parsed_url.path)
+                if match:
+                    repo_path = match.group(1)  # 提取 "owner/repo"
+                    exact_repo_url = f"https://api.github.com/repos/{repo_path}"
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(exact_repo_url, headers=headers) as exact_response:
+                            if exact_response.status == 200:
+                                return await self._fetch_repo_details(session, exact_response, headers)
+                            elif exact_response.status == 404:
+                                return f"Repository '{repo_path}' not found."
+                            else:
+                                return f"Error while fetching repository: HTTP Status {exact_response.status}."
+
+            # 如果是 `git clone` 格式
             match = clone_url_pattern.match(query)
             if match:
-                repo_path = match.group(1)  # 提取 "owner/repo"
+                repo_path = match.group(1)
                 exact_repo_url = f"https://api.github.com/repos/{repo_path}"
                 async with aiohttp.ClientSession() as session:
                     async with session.get(exact_repo_url, headers=headers) as exact_response:
@@ -472,7 +511,7 @@ class WebSearcherPro(Star):
                         else:
                             return f"Error while fetching repository: HTTP Status {exact_response.status}."
 
-            # Step 2: 检查是否是 "owner/repo" 格式
+            # 检查是否是 "owner/repo" 格式
             if "/" in query and not query.startswith("http"):
                 exact_repo_url = f"https://api.github.com/repos/{query}"
                 async with aiohttp.ClientSession() as session:
@@ -522,7 +561,7 @@ class WebSearcherPro(Star):
         """GitHub 仓库搜索命令，支持模糊搜索及详细信息查询。
 
         Args:
-            query (str): 可以是完整 GitHub URL，"git clone" 格式，"owner/repo" 格式的仓库名，或关键词。
+            query (str): 可以是完整 GitHub URL，"git clone" 格式，目录 URL，"owner/repo" 格式的仓库名，或关键词。
         """
         if not query:
             yield event.plain_result("Please provide a repository name, URL, or search keywords.")
