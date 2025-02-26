@@ -7,13 +7,14 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import aiohttp
+from click import command
 from readability import Document
 
 from astrbot.api import *
 from astrbot.api.event import AstrMessageEvent
 from astrbot.api.event.filter import *
 from astrbot.api.star import Context, Star, register
-from astrbot.core.message.components import Image, Plain, Nodes, Node
+from astrbot.core.message.components import Image, Plain, Nodes, Node, File
 from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
 
 
@@ -695,3 +696,8 @@ class WebSearcherPro(Star):
             ns.nodes.append(node)
 
         yield event.chain_result([ns])
+
+    @command("test_liber")
+    async def test_liber(self, event: AstrMessageEvent):
+        file = File(name="test", file="https://gateway-ipfs.st/ipfs/bafykbzaceapf62wqmm6b5mvicvnvextihdftghipdzgsovlz4omuloqcgfu52?filename=Transformer%2C%20BERT%2C%20and%20GPT3%20%3A%20Including%20ChatGPT%20and%20Prompt%20Engineering_Oswald%20Campesato_liber3.pdf")
+        yield event.chain_result([file])
