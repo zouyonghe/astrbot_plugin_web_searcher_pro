@@ -4,7 +4,7 @@ import json
 import os
 import random
 import re
-from typing import Optional
+from typing import Optional, List
 from urllib.parse import urlparse
 
 import aiohttp
@@ -15,7 +15,9 @@ from astrbot.api.event import AstrMessageEvent
 from astrbot.api.event.filter import *
 from astrbot.api.star import Context, Star, register
 from astrbot.core.message.components import Image, Plain, Nodes, Node
-from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
+from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem, \
+    SearchBookResultItem, SearchBookResult
+
 
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.1",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
@@ -571,3 +573,115 @@ class WebSearcherPro(Star):
         result = await self.search_github_repo(event, query)
         yield event.plain_result(result)
 
+    async def get_book_details(self, book_ids: list) -> Optional[dict]:
+        """通过书籍 ID 获取详细信息"""
+        DETAIL_API_URL = "https://lgate.glitternode.ru/v1/book"
+        headers = {"Content-Type": "application/json"}
+        payload = {"book_ids": book_ids}
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(DETAIL_API_URL, headers=headers, json=payload, proxy=self.proxy) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data.get("data", {}).get("book", {})
+                    else:
+                        logger.error(f"请求书籍详细信息失败，状态码: {response.status}")
+                        return None
+        except aiohttp.ClientError as e:
+            logger.error(f"HTTP 客户端错误: {e}")
+        except Exception as e:
+            logger.error(f"发生意外错误: {e}")
+
+        return None
+
+    async def search_books_with_details(self, word: str) -> Optional[dict]:
+        """搜索书籍并获取前 10 本书籍的详细信息"""
+        API_URL = "https://lgate.glitternode.ru/v1/searchV2"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "address": "",
+            "word": word
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(API_URL, headers=headers, json=payload, proxy=self.proxy) as response:
+                    if response.status == 200:
+                        data = await response.json()
+
+                        # 获取书籍 ID 列表
+                        book_data = data.get("book", [])
+                        if not book_data:
+                            logger.info("未找到相关书籍。")
+                            return None
+
+                        book_ids = [item.get("id") for item in book_data[:10]]  # 获取前 10 本书籍的 ID
+                        if not book_ids:
+                            logger.info("未能提取书籍 ID。")
+                            return None
+
+                        # 调用详细信息 API
+                        detailed_books = await self.get_book_details(book_ids)
+                        if not detailed_books:
+                            logger.info("未获取书籍详细信息。")
+                            return None
+
+                        # 返回包含搜索结果及详细信息的数据
+                        return {
+                            "search_results": book_data[:10],  # 原始的前 10 本搜索结果
+                            "detailed_books": detailed_books  # 完整详细信息
+                        }
+
+                    else:
+                        logger.error(f"请求书籍搜索失败，状态码: {response.status}")
+                        return None
+        except aiohttp.ClientError as e:
+            logger.error(f"HTTP 客户端错误: {e}")
+        except Exception as e:
+            logger.error(f"发生意外错误: {e}")
+
+        return None
+
+    @command("search_books")
+    async def search_books_command(self, event: AstrMessageEvent, query: str = None):
+        """搜索书籍并输出详细信息"""
+        if not query:
+            yield event.plain_result("请提供书籍关键词以进行搜索。")
+            return
+
+        logger.info(f"Received book search query: {query}")
+        results = await self.search_books_with_details(query)
+
+        if not results:
+            yield event.plain_result("未找到相关书籍。")
+            return
+
+        # 输出搜索结果和详细信息
+        search_results = results.get("search_results", [])
+        detailed_books = results.get("detailed_books", {})
+
+        ns = Nodes([])
+
+        for index, book in enumerate(search_results, start=1):
+            book_id = book.get("id")
+            detail = detailed_books.get(book_id, {}).get("book", {})
+
+            chain = [
+                Plain(f"标题: {book.get('title', '未知')}\n"),
+                Plain(f"作者: {book.get('author', '未知')}\n"),
+                Plain(f"语言: {detail.get('language', '未知')}\n"),
+                Plain(f"文件大小: {detail.get('filesize', '未知')}\n"),
+                Plain(f"文件类型: {detail.get('extension', '未知')}\n"),
+                Plain(f"年份: {detail.get('year', '未知')}\n"),
+                Plain(f"IPFS CID: {detail.get('ipfs_cid', '未知')}\n"),
+            ]
+
+            node = Node(
+                uin=event.get_self_id(),
+                name="BOOK_INFO",
+                content=chain
+            )
+            ns.nodes.append(node)
+
+        yield event.chain_result([ns])
