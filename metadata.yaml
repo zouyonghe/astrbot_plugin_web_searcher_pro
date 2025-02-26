@@ -1,6 +1,6 @@
 name: astrbot_plugin_web_search_pro
 desc: 使用SearXNG驱动的Web搜索
 help: 参考仓库README
-version: v1.0.1
+version: v1.0.2
 author: buding
 repo: https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro
