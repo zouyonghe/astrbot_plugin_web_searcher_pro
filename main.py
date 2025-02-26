@@ -609,12 +609,12 @@ class WebSearcherPro(Star):
                         data = await response.json()
 
                         # 获取书籍 ID 列表
-                        book_data = data.get("book", [])
+                        book_data = data["data"].get("book", [])
                         if not book_data:
                             logger.info("未找到相关书籍。")
                             return None
 
-                        book_ids = [item.get("id") for item in book_data[:10]]  # 获取前 10 本书籍的 ID
+                        book_ids = [item.get("id") for item in book_data[:50]]  # 获取前 50 本书籍的 ID
                         if not book_ids:
                             logger.info("未能提取书籍 ID。")
                             return None
@@ -627,7 +627,7 @@ class WebSearcherPro(Star):
 
                         # 返回包含搜索结果及详细信息的数据
                         return {
-                            "search_results": book_data[:10],  # 原始的前 10 本搜索结果
+                            "search_results": book_data[:50],  # 原始的前 50 本搜索结果
                             "detailed_books": detailed_books  # 完整详细信息
                         }
 
