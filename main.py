@@ -305,7 +305,7 @@ class WebSearcherPro(Star):
     @llm_tool("web_search_academic")
     async def search_academic(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for academic information
-
+    
         Args:
             query (string): A search query focusing on specific academic topics, keywords, or fields of study (e.g., "machine learning papers" for research on machine learning). Avoid including general terms like "academic content," as the search is already tailored for academic results.
         """
@@ -314,6 +314,18 @@ class WebSearcherPro(Star):
         if not results or not results.results:
             return "No academic information found for your query."
         return str(results)
+
+    @llm_tool("liber3_search")
+    async def liber3_search(self, event: AstrMessageEvent, query: str):
+        """Search books from the Liber3 API and output their details.
+    
+        Args:
+            query (string): A string representing the title, author, or keywords for books to search for.
+        """
+        logger.info(f"Searching books for query: {query}")
+        async for result in self.search_books_from_liber3(event, query):
+            yield result
+
 
     @command("aur")
     async def search_aur(self, event: AstrMessageEvent, query: str):
@@ -641,8 +653,8 @@ class WebSearcherPro(Star):
 
         return None
 
-    @command("search_books")
-    async def search_books_command(self, event: AstrMessageEvent, query: str = None):
+    @command("liber3")
+    async def search_books_from_liber3(self, event: AstrMessageEvent, query: str = None):
         """搜索书籍并输出详细信息"""
         if not query:
             yield event.plain_result("请提供书籍关键词以进行搜索。")
