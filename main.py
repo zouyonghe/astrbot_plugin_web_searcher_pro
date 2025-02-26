@@ -1,10 +1,9 @@
 import asyncio
 import base64
-import json
 import os
 import random
 import re
-from typing import Optional, List
+from typing import Optional
 from urllib.parse import urlparse
 
 import aiohttp
@@ -15,8 +14,7 @@ from astrbot.api.event import AstrMessageEvent
 from astrbot.api.event.filter import *
 from astrbot.api.star import Context, Star, register
 from astrbot.core.message.components import Image, Plain, Nodes, Node
-from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem, \
-    SearchBookResultItem, SearchBookResult
+from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
 
 
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.1",
