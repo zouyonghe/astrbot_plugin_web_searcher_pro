@@ -20,7 +20,7 @@ from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchRes
 @register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.2",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
 class WebSearcherPro(Star):
-    def __init__(self, context: Context, config: dict):
+    def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config
         self.proxy = os.environ.get("https_proxy")
