@@ -1,12 +1,16 @@
 import asyncio
 import base64
+import io
 import os
 import random
 import re
 from typing import Optional
 from urllib.parse import urlparse
+from PIL import Image as Img
 
 import aiohttp
+from aiohttp import ClientPayloadError
+from bs4 import BeautifulSoup
 from readability import Document
 
 from astrbot.api import *
@@ -17,7 +21,7 @@ from astrbot.core.message.components import Image, Plain, Nodes, Node
 from data.plugins.astrbot_plugin_web_searcher_pro.search_models import SearchResult, SearchResultItem
 
 
-@register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.2",
+@register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.0.3",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
 class WebSearcherPro(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -25,14 +29,80 @@ class WebSearcherPro(Star):
         self.config = config
         self.proxy = os.environ.get("https_proxy")
 
-    async def search(self, query: str, categories: str = "general", limit: int = 5) -> Optional[SearchResult]:
+    async def is_url_accessible(self, url: str) -> bool:
+        """
+        异步检查给定的 URL 是否可访问。
+
+        :param url: 要检查的 URL
+        :return: 如果 URL 可访问返回 True，否则返回 False
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.head(url, timeout=3, proxy=self.proxy, allow_redirects=True) as response:
+                    return response.status == 200  # 返回状态是否为 200
+        except:
+            return False  # 如果请求失败（超时、连接中断等）则返回 False
+
+    async def download_and_convert_to_base64(self, cover_url):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(cover_url, proxy=self.proxy) as response:
+                    if response.status != 200:
+                        return None
+
+                    content_type = response.headers.get('Content-Type', '').lower()
+                    # 如果 Content-Type 包含 html，则说明可能不是直接的图片
+                    if 'html' in content_type:
+                        html_content = await response.text()
+                        # 使用 BeautifulSoup 提取图片地址
+                        soup = BeautifulSoup(html_content, 'html.parser')
+                        img_tag = soup.find('meta', attrs={'property': 'og:image'})
+                        if img_tag:
+                            cover_url = img_tag.get('content')
+                            # 再次尝试下载真正的图片地址
+                            return await self.download_and_convert_to_base64(cover_url)
+                        else:
+                            return None
+
+                    # 如果是图片内容，继续下载并转为 Base64
+                    content = await response.read()
+                    base64_data = base64.b64encode(content).decode("utf-8")
+                    return base64_data
+        except (ClientPayloadError, aiohttp.ContentLengthError) as payload_error:
+            logger.warning(f"Ignored ContentLengthError: {payload_error}")
+            # 尝试已接收的数据部分
+            if 'content' in locals():  # 如果部分内容已下载
+                base64_data = base64.b64encode(content).decode("utf-8")
+                if self.is_base64_image(base64_data):  # 检查 Base64 数据是否有效
+                    return base64_data
+        except Exception as e:
+            return None
+
+    def is_base64_image(self, base64_data: str) -> bool:
+        """
+        检测 Base64 数据是否为有效图片
+        :param base64_data: Base64 编码的字符串
+        :return: 如果是图片返回 True，否则返回 False
+        """
+        try:
+            # 解码 Base64 数据
+            image_data = base64.b64decode(base64_data)
+            # 尝试用 Pillow 打开图片
+            image = Img.open(io.BytesIO(image_data))
+            # 如果图片能正确被打开，再检查格式是否为支持的图片格式
+            image.verify()  # 验证图片
+            return True  # Base64 是有效图片
+        except Exception:
+            return False  # 如果解析失败，说明不是图片
+
+    async def search(self, query: str, categories: str = "general", limit: int = 5, engines: list=None) -> Optional[SearchResult]:
         """Perform a search query for a specific category.
     
         Args:
             query (str): The search query string.
             categories (str): The category to search within. Defaults to "general".
             limit (int): The maximum number of results to return. Defaults to 10.
-    
+            engines (str): The search engine to use. Defaults to None. If None, all engines will be used.
         Returns:
             str: A formatted string of search results.
         """
@@ -43,7 +113,7 @@ class WebSearcherPro(Star):
             "categories": categories,
             "format": "json",
             "lang": "zh",
-            "limit": limit
+            "limit": limit,
         }
 
         try:
@@ -70,7 +140,7 @@ class WebSearcherPro(Star):
                                 for item in data.get("results", [])
                             ]
                         )
-                        return await self._result_filter(result, categories, limit)
+                        return await self._result_filter(result, categories, limit, engines)
                     else:
                         logger.error(f"Failed to search SearxNG. HTTP Status: {response.status}, Params: {params}")
                         return None
@@ -81,30 +151,23 @@ class WebSearcherPro(Star):
         except Exception as e:
             logger.error(f"Unexpected error during search: {e}")
 
-    async def _result_filter(self, result: SearchResult, categories: str, limit: int) -> Optional[SearchResult]:
+    async def _result_filter(self, result: SearchResult, categories: str, limit: int, engines: list=None) -> Optional[SearchResult]:
+        if engines:
+            result.results = [item for item in result.results if item.engine in engines]
+
         if categories == "images":
-            result.results = result.results[:50]
+            result.results = result.results[:400]
             urls = [item.img_src for item in result.results if item.img_src]
-            validation_results = await asyncio.gather(*[self._is_validate_image_url(url) for url in urls])
+            validation_results = await asyncio.gather(*[self.is_url_accessible(url) for url in urls])
             result.results = [
                 item for item, is_valid in zip(result.results, validation_results) if is_valid
             ]
-            result = self._find_highest_resolution_image(result, 20)
+            # result = self._find_highest_resolution_image(result, 20)
+            if len(result.results) > 30:
+                result.results = random.sample(result.results, 30)
         else:
             result.results = result.results[:limit]
         return result
-
-    async def _is_validate_image_url(self, img_url: str) -> bool:
-        if not img_url:
-            return False
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.head(img_url, timeout=2) as response:
-                    if response.status == 200 and "image" in response.headers.get("Content-Type", "").lower():
-                        return True
-        except Exception:
-            pass
-        return False
 
     def _find_highest_resolution_image(self, result: SearchResult, limit: int) -> SearchResult:
         """
@@ -204,33 +267,47 @@ class WebSearcherPro(Star):
             query (string): A search query focusing on the topic or keywords of the images (e.g., "nature" for nature-related images). Avoid including general terms like "images," as the search is already scoped to image results.
         """
         logger.info(f"Starting image search for: {query}")
-        result = await self.search(query, categories="images")
+        engines = ["google images", "bing images"]
+        result = await self.search(query, categories="images", engines=engines)
         if result and result.results:
             if self.config.get("enable_random_image", False):
                 selected_image = random.choice(result.results)
                 if self.config.get("enable_image_title", False):
-                    chain = [
-                        Image.fromURL(selected_image.img_src),
-                        Plain(f"{selected_image.title}")
-                    ]
+                    chain = []
+                    base64_image = await self.download_and_convert_to_base64(selected_image.img_src)
+                    if base64_image:
+                        chain.append(Image.fromBase64(base64_image))
+                    else:
+                        yield event.plain_result("下载图片失败。")
+                        return
+                    chain.append(Plain(f"{selected_image.title}"))
                     yield event.chain_result(chain)
                 else:
                     yield event.image_result(selected_image.img_src)
                 return
             else:
-                ns = Nodes([])
-                for idx, item in enumerate(result.results):
-                    if self.config.get("enable_image_title", False):
-                        chain = [Plain(f"{item.title}"), Image.fromURL(item.img_src)]
-                    else:
-                        chain = [Image.fromURL(item.img_src)]
+                # 并发下载多个图片逻辑（优化）
+                async def process_image(item):
+                    """处理单个图片，包括下载与Base64转换"""
+                    base64_image = await self.download_and_convert_to_base64(item.img_src)
 
-                    node = Node(
-                        uin=event.get_self_id(),
-                        name="IMAGE",
-                        content=chain
-                    )
-                    ns.nodes.append(node)
+                    if base64_image:
+                        chain = [Image.fromBase64(base64_image)]
+                        if self.config.get("enable_image_title", False):
+                            chain.append(Plain(f"{item.title}\n"))
+                        return Node(
+                            uin=event.get_self_id(),
+                            name="IMAGE",
+                            content=chain,
+                        )
+                    return None
+
+                # 利用 asyncio.gather 实现并发图片下载与处理
+                tasks = [process_image(item) for idx, item in enumerate(result.results)]
+                nodes = await asyncio.gather(*tasks)
+
+                # 去掉空节点
+                ns = Nodes([node for node in nodes if node])
                 yield event.chain_result([ns])
         else:
             yield event.plain_result("没有找到图片，请稍后再试。")
