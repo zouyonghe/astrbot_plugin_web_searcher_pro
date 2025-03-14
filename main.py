@@ -29,17 +29,22 @@ class WebSearcherPro(Star):
         self.config = config
         self.proxy = os.environ.get("https_proxy")
 
-    async def is_url_accessible(self, url: str) -> bool:
+    async def _is_url_accessible(self, url: str, proxy: bool=True) -> bool:
         """
         异步检查给定的 URL 是否可访问。
 
         :param url: 要检查的 URL
+        :param proxy: 是否使用代理
         :return: 如果 URL 可访问返回 True，否则返回 False
         """
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.head(url, timeout=3, proxy=self.proxy, allow_redirects=True) as response:
-                    return response.status == 200  # 返回状态是否为 200
+                if proxy:
+                    async with session.head(url, timeout=5, proxy=self.proxy, allow_redirects=True) as response:
+                        return response.status == 200
+                else:
+                    async with session.head(url, timeout=5, allow_redirects=True) as response:
+                        return response.status == 200
         except:
             return False  # 如果请求失败（超时、连接中断等）则返回 False
 
@@ -158,7 +163,7 @@ class WebSearcherPro(Star):
         if categories == "images":
             result.results = result.results[:400]
             urls = [item.img_src for item in result.results if item.img_src]
-            validation_results = await asyncio.gather(*[self.is_url_accessible(url) for url in urls])
+            validation_results = await asyncio.gather(*[self._is_url_accessible(url) for url in urls])
             result.results = [
                 item for item, is_valid in zip(result.results, validation_results) if is_valid
             ]
@@ -452,7 +457,7 @@ class WebSearcherPro(Star):
             logger.error(f"Unexpected error during AUR search: {e}")
 
     @llm_tool("fetch_url")
-    async def fetch_website_content(self, event: AstrMessageEvent, url: str) -> str:
+    async def fetch_website_content(self, event: AstrMessageEvent, url: str):
         """Fetch the content of a website using the provided URL.This function must not be used to download e-books.
         When to use:
             1. A user requests the content or summary of a particular website via a query or message.
@@ -479,6 +484,9 @@ class WebSearcherPro(Star):
 
                 # 如果不是仓库路径，返回错误提示
                 return "The provided GitHub link is not a valid repository link."
+
+            if not await self._is_url_accessible(url):
+                return "Unable to access the URL."
 
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
