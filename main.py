@@ -4,6 +4,7 @@ import io
 import os
 import random
 import re
+from datetime import datetime
 from typing import Optional
 from urllib.parse import urlparse
 from PIL import Image as Img
@@ -397,65 +398,6 @@ class WebSearcherPro(Star):
             return "No academic information found for your query."
         return str(results)
 
-    @command("aur")
-    async def search_aur(self, event: AstrMessageEvent, query: str):
-        """Search packages from the Arch User Repository (AUR).
-    
-        Args:
-            query (string): The package name or keywords to search for in the AUR.
-        """
-        logger.info(f"Searching AUR packages for: {query}")
-        aur_api_url = "https://aur.archlinux.org/rpc/v5/search"
-        params = {"arg": query, "by": "name"}
-
-        if len(query) < 2:
-            yield event.plain_result("Search query must be at least 2 characters long.")
-
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(aur_api_url, params=params) as response:
-                    if response.status != 200:
-                        logger.error(f"AUR API request failed with status {response.status}.")
-                        yield event.plain_result(f"AUR search failed with status {response.status}.")
-                        return
-
-                    data = await response.json()
-                    if data.get("type") == "error":
-                        logger.error(f"AUR API responded with an error: {data.get('error')}.")
-                        yield event.plain_result(f"AUR search error: {data.get('error')}")
-                        return
-
-                    results = data.get("results", [])
-                    if not results:
-                        yield event.plain_result(f"No AUR packages found for query: {query}")
-                        return
-
-                    # 精准匹配逻辑
-                    exact_match = next((pkg for pkg in results if pkg.get("Name") == query), None)
-                    if exact_match:
-                        # 如果有精确匹配的包，则返回其详情
-                        yield event.plain_result (
-                            f"**Package Details**\n"
-                            f"Name: {exact_match.get('Name')}\n"
-                            f"Description: {exact_match.get('Description')}\n"
-                            f"Maintainer: {exact_match.get('Maintainer') or 'N/A'}\n"
-                            f"Votes: {exact_match.get('NumVotes')}\n"
-                            f"Popularity: {exact_match.get('Popularity')}\n"
-                            f"Last Updated: {exact_match.get('LastModified')}"
-                        )
-                        return
-
-                    formatted_results = "\n".join(
-                        [f"* {item.get('Name')} - {item.get('Description')} (Votes: {item.get('NumVotes')})"
-                         for item in results]
-                    )
-                    yield event.plain_result(formatted_results)
-                    return
-        except aiohttp.ClientError as e:
-            logger.error(f"HTTP client error during AUR search: {e}")
-        except Exception as e:
-            logger.error(f"Unexpected error during AUR search: {e}")
-
     @llm_tool("fetch_url")
     async def fetch_website_content(self, event: AstrMessageEvent, url: str):
         """Fetch the content of a website using the provided URL.用于抓取网页，应在查看网页、获取网页时使用。
@@ -496,6 +438,65 @@ class WebSearcherPro(Star):
         except Exception as e:
             logger.error(f"fetch_website_content 出现问题: {e}")
             return "Fetch URL failed, please try again later."
+
+    @command("aur")
+    async def search_aur(self, event: AstrMessageEvent, query: str):
+        """Search packages from the Arch User Repository (AUR).
+
+        Args:
+            query (string): The package name or keywords to search for in the AUR.
+        """
+        logger.info(f"Searching AUR packages for: {query}")
+        aur_api_url = "https://aur.archlinux.org/rpc/v5/search"
+        params = {"arg": query, "by": "name"}
+
+        if len(query) < 2:
+            yield event.plain_result("Search query must be at least 2 characters long.")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(aur_api_url, params=params) as response:
+                    if response.status != 200:
+                        logger.error(f"AUR API request failed with status {response.status}.")
+                        yield event.plain_result(f"AUR search failed with status {response.status}.")
+                        return
+
+                    data = await response.json()
+                    if data.get("type") == "error":
+                        logger.error(f"AUR API responded with an error: {data.get('error')}.")
+                        yield event.plain_result(f"AUR search error: {data.get('error')}")
+                        return
+
+                    results = data.get("results", [])
+                    if not results:
+                        yield event.plain_result(f"No AUR packages found for query: {query}")
+                        return
+
+                    # 精准匹配逻辑
+                    exact_match = next((pkg for pkg in results if pkg.get("Name") == query), None)
+                    if exact_match:
+                        # 如果有精确匹配的包，则返回其详情
+                        yield event.plain_result(
+                            f"**Package Details**\n"
+                            f"Name: {exact_match.get('Name')}\n"
+                            f"Description: {exact_match.get('Description')}\n"
+                            f"Maintainer: {exact_match.get('Maintainer') or 'N/A'}\n"
+                            f"Votes: {exact_match.get('NumVotes')}\n"
+                            f"Popularity: {exact_match.get('Popularity')}\n"
+                            f"Last Updated: {datetime.fromtimestamp(exact_match.get('LastModified')).strftime('%Y-%m-%d %H:%M:%S')}"
+                        )
+                        return
+
+                    formatted_results = "\n".join(
+                        [f"* {item.get('Name')} - {item.get('Description')} (Votes: {item.get('NumVotes')})"
+                         for item in results]
+                    )
+                    yield event.plain_result(formatted_results)
+                    return
+        except aiohttp.ClientError as e:
+            logger.error(f"HTTP client error during AUR search: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error during AUR search: {e}")
 
     async def _fetch_repo_details(self, session, exact_response, headers):
         """
