@@ -1,9 +1,8 @@
-# engines/search_models.py
 from dataclasses import dataclass, field
-from typing import List, Optional, TypedDict
+from typing import Any, Iterable, List, Mapping
 
 
-@dataclass
+@dataclass(slots=True)
 class SearchResultItem:
     title: str
     url: str
@@ -14,18 +13,43 @@ class SearchResultItem:
     engine: str
     score: float
 
+    @classmethod
+    def from_mapping(cls, item: Mapping[str, Any]) -> "SearchResultItem":
+        return cls(
+            title=str(item.get("title", "")),
+            url=str(item.get("url", "")),
+            img_src=str(item.get("img_src", "")),
+            resolution=str(item.get("resolution", "")),
+            iframe_src=str(item.get("iframe_src", "")),
+            content=str(item.get("content", "")),
+            engine=str(item.get("engine", "")),
+            score=float(item.get("score", 0.0) or 0.0),
+        )
 
-@dataclass
+
+@dataclass(slots=True)
 class SearchResult:
     results: List[SearchResultItem] = field(default_factory=list)
 
     def __iter__(self):
-        """使 SearchResult 类支持迭代"""
         return iter(self.results)
 
+    def __len__(self) -> int:
+        return len(self.results)
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.results
+
+    def limited(self, limit: int) -> "SearchResult":
+        return SearchResult(results=list(self.results[:limit]))
+
+    @classmethod
+    def from_iterable(cls, items: Iterable[Mapping[str, Any]]) -> "SearchResult":
+        return cls(results=[SearchResultItem.from_mapping(item) for item in items])
+
     def __str__(self) -> str:
-        """提供结果的字符串形式"""
-        if not self.results:  # 如果 results 为空
+        if not self.results:
             return "No results."
 
         formatted_results = [

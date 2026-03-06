@@ -1,49 +1,85 @@
 # WebSearcherPro 插件
 
-更高性能的 Web 检索 AstrBot 插件，支持多种类别的内容搜索以及 URL 内容提取。
+基于 SearXNG 的 AstrBot Web 检索插件，支持网页搜索、图片搜索、网页正文抓取、GitHub 仓库查询和 AUR 包检索。
 
-# 配置
+## LLM 工具命名
 
-可参考 `https://docs.openwebui.com/tutorials/web-search/searxng` 部署SearXNG，细节较多，建议熟悉Linux和命令行的同学尝试。
+为避免与其他插件发生 `llm_tool` 名称碰撞，插件导出的工具名已统一改为 `searxng_*` 前缀：
 
-# 技术实现
+- `searxng_web_search_general`
+- `searxng_web_search_images`
+- `searxng_web_search_videos`
+- `searxng_web_search_news`
+- `searxng_web_search_science`
+- `searxng_web_search_music`
+- `searxng_web_search_technical`
+- `searxng_web_search_academic`
+- `searxng_web_fetch_url`
+- `searxng_github_search`
 
-插件使用 Python 编写，基于 AstrBot 提供了多种高性能检索功能，支持灵活扩展和定制。以下是一些主要实现特点：
+## 架构
 
-- 异步操作：通过 `aiohttp` 和 `asyncio` 实现高效的 HTTP 请求和任务并发处理。
-- 自定义过滤：支持对检索结果进行过滤，比如基于分辨率筛选图片。
-- 丰富的指令：包括网页搜索、图片搜索、GitHub 仓库查询、书籍详细信息检索等。
-- API 综合利用：对于不同类别的数据检索，使用了诸如 SearXNG、Liber3 和 GitHub 等不同的 API。
-- 可配置：支持通过配置文件添加代理、自定义 API 地址，并且某些功能具有随机性（如随机图片选择）。
+重构后代码按职责拆分：
 
-# 使用方法
+- `main.py`：AstrBot 插件入口、命令注册、工具绑定
+- `config.py`：配置加载与默认值
+- `services/`：SearXNG、GitHub、网页抓取、图片处理、AUR、HTTP 客户端
+- `formatters/`：统一文本格式化
+- `utils/`：URL 解析等纯函数
+- `tests/`：可在 `astrbot` 环境中运行的单测
 
-1. 初始化 AstrBot 并安装 WebSearcherPro 插件。
-2. 配置 `searxng_api_url` 等选项。
-3. 使用命令控制功能（如 `/websearch on` 开启网页搜索功能）。
-4. 通过自然语言调用对应指令实现功能。
+## 配置
 
-# 指令列表
+可参考 `https://docs.openwebui.com/tutorials/web-search/searxng` 部署 SearXNG。
 
-| 指令/自然语言           | 参数           | 示例               | 说明                |
-|-------------------|--------------|------------------|-------------------|
-| `/websearch`      | `on/off` 或 空 | `/websearch on`  | 开启/关闭网页搜索功能       |
-| `websearch_images` | `关键词`        | `搜索图片 晴空塔`       | 搜索相关图片            |
-| `websearch_videos` | `关键词`        | `搜索视频 哆啦A梦`      | 搜索相关视频            |
-| `websearch_news`  | `关键词`        | `搜索新闻 冬奥会`       | 搜索相关新闻            |
-| `websearch_music` | `关键词`        | `搜索音乐 许嵩`        | 搜索相关音乐资源          |
-| `websearch_science` | `关键词`        | `搜索科学 黑洞`        | 搜索科学内容            |
-| `websearch_academic` | `关键词`        | `搜索学术 MLP`       | 搜索学术论文或者学术资料      |
-| `/github`         | `URL/关键词`    | `/github flask`  | 搜索 GitHub 仓库      |
-| `/liber3`         | `书籍关键词`      | `/liber3 python` | 从 Liber3 API 搜索书籍 |
+当前支持的关键配置：
 
-# 注意事项
+- `searxng_api_url`：SearXNG API 地址
+- `request_timeout`：统一网络请求超时秒数
+- `enable_random_image`：图片搜索是否只返回一张随机图
+- `enable_image_title`：图片结果是否附带标题
+- `image_result_limit`：图片搜索最终返回数量上限
+- `image_candidate_limit`：图片搜索预筛选候选数量
+- `github_token`：提高 GitHub API 配额
 
-1. **API 配额**：某些功能依赖外部 API（如 GitHub），其接口访问频率可能会受限。建议配置相应 Token 提升配额容量。
-2. **图片搜索标题**：若启用图片标题功能（`enable_image_title: true`），图片结果会包含标题，默认关闭。
+## 使用方法
 
-# 问题反馈
+1. 安装插件并配置 `searxng_api_url`。
+2. 使用 `/websearch on` 开启网页搜索工具。
+3. 通过命令或自然语言触发对应能力。
+
+## 指令列表
+
+| 指令/工具 | 参数 | 示例 | 说明 |
+|---|---|---|---|
+| `/websearch` | `on/off` 或 空 | `/websearch on` | 开启/关闭网页搜索能力 |
+| `searxng_web_search_general` | `关键词` | `搜索 Python asyncio` | 通用网页搜索 |
+| `searxng_web_search_images` | `关键词` | `搜索图片 晴空塔` | 图片搜索 |
+| `searxng_web_search_videos` | `关键词` | `搜索视频 哆啦A梦` | 视频搜索 |
+| `searxng_web_search_news` | `关键词` | `搜索新闻 冬奥会` | 新闻搜索 |
+| `searxng_web_search_science` | `关键词` | `搜索科学 黑洞` | 科学搜索 |
+| `searxng_web_search_academic` | `关键词` | `搜索学术 MLP` | 学术搜索 |
+| `searxng_web_fetch_url` | `URL` | `获取 https://example.com` | 提取网页正文或 GitHub 仓库内容 |
+| `/github` | `URL/关键词` | `/github flask` | 搜索 GitHub 仓库 |
+| `searxng_github_search` | `URL/关键词` | `搜索 GitHub owner/repo` | GitHub 仓库工具 |
+| `/aur` | `包名/关键词` | `/aur firefox` | 查询 AUR 包 |
+
+## 开发与测试
+
+建议在 `mamba` 的 `astrbot` 环境内执行：
+
+- 安装运行依赖：`pip install -r requirements.txt`
+- 安装测试依赖：`pip install -r requirements-dev.txt`
+- 运行测试：`pytest -q`
+
+## 注意事项
+
+1. GitHub、网页抓取、AUR 等能力依赖外部服务，建议配置合理超时与代理。
+2. 图片搜索会先做可访问性校验，再按分辨率和搜索得分排序。
+3. 若启用 `enable_random_image`，图片模式只返回一张结果。
+
+## 问题反馈
 
 如出现问题，请通过以下途径联系：
-QQ: 1259085392，或者提交 GitHub
-Issue：[WebSearcherPro 仓库](https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro/issues)
+QQ: 1259085392，或者提交 GitHub Issue：
+[WebSearcherPro 仓库](https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro/issues)

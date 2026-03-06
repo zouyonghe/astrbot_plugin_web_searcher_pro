@@ -9,12 +9,30 @@
         "type": "bool",
         "description": "开启随机图片",
         "default": false,
-        "hint": "如果开启则只显示结果中一张随机图片，关闭则显示结果中前20张图片"
+        "hint": "如果开启则只显示结果中一张随机图片，关闭则显示多张筛选后的图片"
     },
     "enable_image_title": {
         "type": "bool",
         "description": "开启图片标题",
         "default": true
+    },
+    "request_timeout": {
+        "type": "int",
+        "description": "网络请求超时时间（秒）",
+        "default": 15,
+        "hint": "统一用于 SearXNG、GitHub、网页抓取等外部请求"
+    },
+    "image_result_limit": {
+        "type": "int",
+        "description": "图片搜索最终返回数量上限",
+        "default": 12,
+        "hint": "插件会先筛选可访问图片，再按分辨率和得分排序后取前 N 张"
+    },
+    "image_candidate_limit": {
+        "type": "int",
+        "description": "图片搜索预筛选候选数量",
+        "default": 120,
+        "hint": "候选越大筛选更充分，但也会增加请求开销"
     },
     "github_token": {
         "type": "string",

@@ -1,2 +1,4 @@
 aiohttp
+beautifulsoup4
+pillow
 readability-lxml
