@@ -28,7 +28,7 @@ IMAGE_EMPTY_MESSAGE = "没有找到图片，请稍后再试。"
 IMAGE_DOWNLOAD_FAILED = "图片下载失败，请稍后再试。"
 
 
-@register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.1.1",
+@register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.1.2",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
 class WebSearcherPro(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
