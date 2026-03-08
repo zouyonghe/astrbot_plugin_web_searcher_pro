@@ -18,17 +18,50 @@ from .services.web_fetch_service import WebFetchService
 
 
 GENERAL_EMPTY_MESSAGE = "No information found for your query."
+GENERAL_TOOL_NAME = "searxng_web_search_general"
 VIDEOS_EMPTY_MESSAGE = "No videos found for your query."
+IMAGES_TOOL_NAME = "searxng_web_search_images"
+VIDEOS_TOOL_NAME = "searxng_web_search_videos"
 NEWS_EMPTY_MESSAGE = "No news found for your query."
+NEWS_TOOL_NAME = "searxng_web_search_news"
 SCIENCE_EMPTY_MESSAGE = "No science information found for your query."
+SCIENCE_TOOL_NAME = "searxng_web_search_science"
 MUSIC_EMPTY_MESSAGE = "No music found for your query."
+MUSIC_TOOL_NAME = "searxng_web_search_music"
 TECHNICAL_EMPTY_MESSAGE = "No technical information found for your query."
+TECHNICAL_TOOL_NAME = "searxng_web_search_technical"
 ACADEMIC_EMPTY_MESSAGE = "No academic information found for your query."
+ACADEMIC_TOOL_NAME = "searxng_web_search_academic"
+MAP_EMPTY_MESSAGE = "No map information found for your query."
+MAP_TOOL_NAME = "searxng_web_search_map"
+FILES_EMPTY_MESSAGE = "No files found for your query."
+FILES_TOOL_NAME = "searxng_web_search_files"
+SOCIAL_EMPTY_MESSAGE = "No social information found for your query."
+SOCIAL_TOOL_NAME = "searxng_web_search_social"
+BOOKS_EMPTY_MESSAGE = "No books found for your query."
+BOOKS_TOOL_NAME = "searxng_web_search_books"
 IMAGE_EMPTY_MESSAGE = "没有找到图片，请稍后再试。"
 IMAGE_DOWNLOAD_FAILED = "图片下载失败，请稍后再试。"
+FETCH_URL_TOOL_NAME = "searxng_web_fetch_url"
+
+WEBSEARCH_TOOL_NAMES = (
+    GENERAL_TOOL_NAME,
+    IMAGES_TOOL_NAME,
+    VIDEOS_TOOL_NAME,
+    NEWS_TOOL_NAME,
+    SCIENCE_TOOL_NAME,
+    MUSIC_TOOL_NAME,
+    TECHNICAL_TOOL_NAME,
+    ACADEMIC_TOOL_NAME,
+    MAP_TOOL_NAME,
+    FILES_TOOL_NAME,
+    SOCIAL_TOOL_NAME,
+    BOOKS_TOOL_NAME,
+    FETCH_URL_TOOL_NAME,
+)
 
 
-@register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.1.2",
+@register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.1.3",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
 class WebSearcherPro(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -54,8 +87,7 @@ class WebSearcherPro(Star):
         provider_settings = self.context.get_config()["provider_settings"]
         provider_settings["web_search"] = status
         self.context.get_config().save_config()
-        tools = ["searxng_web_search_general", "searxng_web_fetch_url"]
-        for tool_name in tools:
+        for tool_name in WEBSEARCH_TOOL_NAMES:
             if status:
                 self.context.activate_llm_tool(tool_name)
             else:
@@ -108,7 +140,7 @@ class WebSearcherPro(Star):
 
         yield event.plain_result("操作参数错误，应为 on 或 off")
 
-    @llm_tool("searxng_web_search_general")
+    @llm_tool(GENERAL_TOOL_NAME)
     async def search_general(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for general information.
 
@@ -117,7 +149,7 @@ class WebSearcherPro(Star):
         """
         return await self._search_text_category(query, category="general", empty_message=GENERAL_EMPTY_MESSAGE)
 
-    @llm_tool("searxng_web_search_images")
+    @llm_tool(IMAGES_TOOL_NAME)
     async def search_images(self, event: AstrMessageEvent, query: str):
         """Search the web for images.
 
@@ -156,7 +188,7 @@ class WebSearcherPro(Star):
             return
         yield event.chain_result([Nodes(valid_nodes)])
 
-    @llm_tool("searxng_web_search_videos")
+    @llm_tool(VIDEOS_TOOL_NAME)
     async def search_videos(self, event: AstrMessageEvent, query: str):
         """Search the web for videos.
 
@@ -165,7 +197,7 @@ class WebSearcherPro(Star):
         """
         return await self._search_text_category(query, category="videos", empty_message=VIDEOS_EMPTY_MESSAGE)
 
-    @llm_tool("searxng_web_search_news")
+    @llm_tool(NEWS_TOOL_NAME)
     async def search_news(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for news.
 
@@ -174,7 +206,7 @@ class WebSearcherPro(Star):
         """
         return await self._search_text_category(query, category="news", empty_message=NEWS_EMPTY_MESSAGE)
 
-    @llm_tool("searxng_web_search_science")
+    @llm_tool(SCIENCE_TOOL_NAME)
     async def search_science(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for scientific information.
 
@@ -183,7 +215,7 @@ class WebSearcherPro(Star):
         """
         return await self._search_text_category(query, category="science", empty_message=SCIENCE_EMPTY_MESSAGE)
 
-    @llm_tool("searxng_web_search_music")
+    @llm_tool(MUSIC_TOOL_NAME)
     async def search_music(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for music-related information.
 
@@ -192,7 +224,7 @@ class WebSearcherPro(Star):
         """
         return await self._search_text_category(query, category="music", empty_message=MUSIC_EMPTY_MESSAGE)
 
-    @llm_tool("searxng_web_search_technical")
+    @llm_tool(TECHNICAL_TOOL_NAME)
     async def search_technical(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for technical information.
 
@@ -201,7 +233,7 @@ class WebSearcherPro(Star):
         """
         return await self._search_text_category(query, category="technical", empty_message=TECHNICAL_EMPTY_MESSAGE)
 
-    @llm_tool("searxng_web_search_academic")
+    @llm_tool(ACADEMIC_TOOL_NAME)
     async def search_academic(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for academic information.
 
@@ -210,7 +242,43 @@ class WebSearcherPro(Star):
         """
         return await self._search_text_category(query, category="academic", empty_message=ACADEMIC_EMPTY_MESSAGE)
 
-    @llm_tool("searxng_web_fetch_url")
+    @llm_tool(MAP_TOOL_NAME)
+    async def search_map(self, event: AstrMessageEvent, query: str) -> str:
+        """Search the web for map-related information.
+
+        Args:
+            query (string): A search query focused on places, addresses, landmarks, routes, or geographic points of interest.
+        """
+        return await self._search_text_category(query, category="map", empty_message=MAP_EMPTY_MESSAGE)
+
+    @llm_tool(FILES_TOOL_NAME)
+    async def search_files(self, event: AstrMessageEvent, query: str) -> str:
+        """Search the web for files.
+
+        Args:
+            query (string): A search query focused on downloadable documents, datasets, manuals, PDFs, presentations, or other file-like resources.
+        """
+        return await self._search_text_category(query, category="files", empty_message=FILES_EMPTY_MESSAGE)
+
+    @llm_tool(SOCIAL_TOOL_NAME)
+    async def search_social(self, event: AstrMessageEvent, query: str) -> str:
+        """Search the web for social content.
+
+        Args:
+            query (string): A search query about people, accounts, posts, communities, or discussions on social platforms.
+        """
+        return await self._search_text_category(query, category="social", empty_message=SOCIAL_EMPTY_MESSAGE)
+
+    @llm_tool(BOOKS_TOOL_NAME)
+    async def search_books(self, event: AstrMessageEvent, query: str) -> str:
+        """Search the web for books.
+
+        Args:
+            query (string): A search query about book titles, authors, editions, ISBNs, subjects, or reading recommendations.
+        """
+        return await self._search_text_category(query, category="books", empty_message=BOOKS_EMPTY_MESSAGE)
+
+    @llm_tool(FETCH_URL_TOOL_NAME)
     async def fetch_website_content(self, event: AstrMessageEvent, url: str):
         """Fetch readable content from a website URL.
 

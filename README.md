@@ -14,6 +14,10 @@
 - `searxng_web_search_music`
 - `searxng_web_search_technical`
 - `searxng_web_search_academic`
+- `searxng_web_search_map`
+- `searxng_web_search_files`
+- `searxng_web_search_social`
+- `searxng_web_search_books`
 - `searxng_web_fetch_url`
 - `searxng_github_search`
 
@@ -58,11 +62,22 @@
 | `searxng_web_search_videos` | `关键词` | `搜索视频 哆啦A梦` | 视频搜索 |
 | `searxng_web_search_news` | `关键词` | `搜索新闻 冬奥会` | 新闻搜索 |
 | `searxng_web_search_science` | `关键词` | `搜索科学 黑洞` | 科学搜索 |
+| `searxng_web_search_technical` | `关键词` | `搜索技术 Python asyncio` | 技术搜索，优先开发者结果并自动回退 |
 | `searxng_web_search_academic` | `关键词` | `搜索学术 MLP` | 学术搜索 |
+| `searxng_web_search_map` | `地点/关键词` | `搜索地图 上海迪士尼` | 地图搜索 |
+| `searxng_web_search_files` | `关键词` | `搜索文件 Python PDF 教程` | 文件搜索 |
+| `searxng_web_search_social` | `关键词` | `搜索社交 Mastodon OpenAI` | 社交内容搜索 |
+| `searxng_web_search_books` | `关键词` | `搜索图书 深度学习` | 图书搜索 |
 | `searxng_web_fetch_url` | `URL` | `获取 https://example.com` | 提取网页正文或 GitHub 仓库内容 |
 | `/github` | `URL/关键词` | `/github flask` | 搜索 GitHub 仓库 |
 | `searxng_github_search` | `URL/关键词` | `搜索 GitHub owner/repo` | GitHub 仓库工具 |
 | `/aur` | `包名/关键词` | `/aur firefox` | 查询 AUR 包 |
+
+## 搜索行为
+
+- 文本搜索会根据查询语言自动推断搜索语言；混合或不明确的查询会回退为 `auto`。
+- `searxng_web_search_technical` 会优先使用更适合开发者内容的分类，并在结果不足时按策略自动回退，提升技术文档与资料命中率。
+- `searxng_web_search_map`、`searxng_web_search_files`、`searxng_web_search_social`、`searxng_web_search_books` 分别用于地图、文件、社交内容和图书搜索。
 
 ## 开发与测试
 
