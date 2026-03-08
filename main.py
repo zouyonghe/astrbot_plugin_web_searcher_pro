@@ -110,10 +110,22 @@ class WebSearcherPro(Star):
 
     @llm_tool("searxng_web_search_general")
     async def search_general(self, event: AstrMessageEvent, query: str) -> str:
+        """Search the web for general information.
+
+        Args:
+            query (string): A search query used to fetch general web-based information.
+        """
         return await self._search_text_category(query, category="general", empty_message=GENERAL_EMPTY_MESSAGE)
 
     @llm_tool("searxng_web_search_images")
     async def search_images(self, event: AstrMessageEvent, query: str):
+        """Search the web for images.
+
+        Use this tool when the user wants existing images about a topic.
+
+        Args:
+            query (string): A search query focused on the subject of the images, such as landmarks, products, people, or scenes. Do not add generic words like "images" because this tool already searches image results.
+        """
         logger.info(f"Starting image search for: {query}")
         result = await self.searxng_service.search(
             query,
@@ -146,30 +158,67 @@ class WebSearcherPro(Star):
 
     @llm_tool("searxng_web_search_videos")
     async def search_videos(self, event: AstrMessageEvent, query: str):
+        """Search the web for videos.
+
+        Args:
+            query (string): A search query focused on the topic or keywords of the videos. Avoid adding broad helper words like "videos" because the search is already scoped to video results.
+        """
         return await self._search_text_category(query, category="videos", empty_message=VIDEOS_EMPTY_MESSAGE)
 
     @llm_tool("searxng_web_search_news")
     async def search_news(self, event: AstrMessageEvent, query: str) -> str:
+        """Search the web for news.
+
+        Args:
+            query (string): A search query focused on the topic, event, company, or person in the news. Avoid adding the word "news" unless it is part of the actual subject.
+        """
         return await self._search_text_category(query, category="news", empty_message=NEWS_EMPTY_MESSAGE)
 
     @llm_tool("searxng_web_search_science")
     async def search_science(self, event: AstrMessageEvent, query: str) -> str:
+        """Search the web for scientific information.
+
+        Args:
+            query (string): A search query about scientific topics, research areas, discoveries, or concepts, such as "quantum mechanics" or "CRISPR gene editing".
+        """
         return await self._search_text_category(query, category="science", empty_message=SCIENCE_EMPTY_MESSAGE)
 
     @llm_tool("searxng_web_search_music")
     async def search_music(self, event: AstrMessageEvent, query: str) -> str:
+        """Search the web for music-related information.
+
+        Args:
+            query (string): A search query about songs, albums, artists, genres, lyrics, performances, or music topics. Avoid redundant helper words when the subject is already clear.
+        """
         return await self._search_text_category(query, category="music", empty_message=MUSIC_EMPTY_MESSAGE)
 
     @llm_tool("searxng_web_search_technical")
     async def search_technical(self, event: AstrMessageEvent, query: str) -> str:
+        """Search the web for technical information.
+
+        Args:
+            query (string): A search query about specific technical topics, engineering concepts, APIs, programming languages, frameworks, or troubleshooting details.
+        """
         return await self._search_text_category(query, category="technical", empty_message=TECHNICAL_EMPTY_MESSAGE)
 
     @llm_tool("searxng_web_search_academic")
     async def search_academic(self, event: AstrMessageEvent, query: str) -> str:
+        """Search the web for academic information.
+
+        Args:
+            query (string): A search query about academic topics, papers, authors, fields of study, or research keywords. Keep the query focused on the subject rather than generic academic wording.
+        """
         return await self._search_text_category(query, category="academic", empty_message=ACADEMIC_EMPTY_MESSAGE)
 
     @llm_tool("searxng_web_fetch_url")
     async def fetch_website_content(self, event: AstrMessageEvent, url: str):
+        """Fetch readable content from a website URL.
+
+        Use this tool when the user provides a webpage and wants its main content, or when a GitHub repository URL should be analyzed through the GitHub tool path. Do not use it for downloading e-books or arbitrary binary files.
+
+        Args:
+            url (string): The full HTTP or HTTPS URL of the page to fetch.
+        """
         logger.info(f"Fetching web content for: {url}")
         return await self.web_fetch_service.fetch(url)
 
@@ -181,6 +230,13 @@ class WebSearcherPro(Star):
 
     @llm_tool("searxng_github_search")
     async def search_github_repo(self, event: AstrMessageEvent, query: str) -> str:
+        """Search GitHub repositories or inspect a specific repository.
+
+        Use this tool when the user asks about a GitHub repository, provides an `owner/repo`, a GitHub URL, a clone URL, or wants repository search results.
+
+        Args:
+            query (string): Repository keywords, an `owner/repo` identifier, a GitHub repository URL, or a clone URL.
+        """
         logger.info(f"Searching GitHub repositories for: {query}")
         return await self.github_service.search(query)
 
