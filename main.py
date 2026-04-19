@@ -61,7 +61,7 @@ WEBSEARCH_TOOL_NAMES = (
 )
 
 
-@register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.1.3",
+@register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.1.4",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
 class WebSearcherPro(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -82,9 +82,26 @@ class WebSearcherPro(Star):
         )
         self.web_fetch_service = WebFetchService(self.http_client, self.github_service)
         self.aur_service = AurService(self.http_client)
+        self._apply_startup_websearch_default()
+
+    def _get_provider_settings(self) -> dict:
+        config = self.context.get_config()
+        provider_settings = config.get("provider_settings")
+        if not isinstance(provider_settings, dict):
+            provider_settings = {}
+            config["provider_settings"] = provider_settings
+        return provider_settings
+
+    def _apply_startup_websearch_default(self) -> None:
+        if not self.plugin_config.default_web_search_enabled:
+            return
+        provider_settings = self._get_provider_settings()
+        if provider_settings.get("web_search"):
+            return
+        self._set_websearch_status(True)
 
     def _set_websearch_status(self, status: bool) -> None:
-        provider_settings = self.context.get_config()["provider_settings"]
+        provider_settings = self._get_provider_settings()
         provider_settings["web_search"] = status
         self.context.get_config().save_config()
         for tool_name in WEBSEARCH_TOOL_NAMES:
@@ -113,7 +130,11 @@ class WebSearcherPro(Star):
 
     @command("websearch")
     async def websearch(self, event: AstrMessageEvent, operation: str = None):
-        websearch = self.context.get_config()["provider_settings"]["web_search"]
+        """Only use this command when the user explicitly wants to enable or disable web search.
+
+        This command is for toggling the plugin's web-search tools. Do not use it for ordinary search requests.
+        """
+        websearch = bool(self._get_provider_settings().get("web_search", False))
         if operation is None:
             status_now = "开启" if websearch else "关闭"
             yield event.plain_result(
@@ -165,6 +186,9 @@ class WebSearcherPro(Star):
             limit=self.plugin_config.image_result_limit,
             engines=["google images", "bing images"],
         )
+        if result.error_message:
+            yield event.plain_result(result.error_message)
+            return
         if result.is_empty:
             yield event.plain_result(IMAGE_EMPTY_MESSAGE)
             return
@@ -292,6 +316,10 @@ class WebSearcherPro(Star):
 
     @command("aur")
     async def search_aur(self, event: AstrMessageEvent, query: str):
+        """Only use this command when the user explicitly asks for an Arch Linux or AUR package.
+
+        This command is only for package lookup in the Arch User Repository. Do not use it for general web search, people, news, or ordinary background research.
+        """
         logger.info(f"Searching AUR packages for: {query}")
         result = await self.aur_service.search(query)
         yield event.plain_result(result)
@@ -310,6 +338,10 @@ class WebSearcherPro(Star):
 
     @command("github")
     async def github_search(self, event: AstrMessageEvent, query: str = None):
+        """Only use this command when the user explicitly asks to run the /github command.
+
+        This command is for manual GitHub repository lookup from chat. Do not treat general web-search requests as a /github command.
+        """
         if not query:
             yield event.plain_result("Please provide a repository name, URL, or search keywords.")
             return

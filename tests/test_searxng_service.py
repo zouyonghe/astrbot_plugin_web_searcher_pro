@@ -310,6 +310,23 @@ async def test_search_returns_empty_result_for_malformed_results_payload():
 
 
 @pytest.mark.asyncio
+async def test_search_returns_configuration_error_for_403_response():
+    client = DummyHttpClient(
+        {
+            "news": (403, {"error": "Forbidden"}),
+        }
+    )
+    service = SearxngService(client, "http://example.com")
+
+    result = await service.search("today news", category="news", limit=5)
+
+    assert result.is_empty
+    assert result.error_message == (
+        "SearXNG returned 403 Forbidden. Please check whether the /search JSON interface is enabled and reachable."
+    )
+
+
+@pytest.mark.asyncio
 async def test_search_falls_back_when_result_item_has_invalid_score_value():
     client = DummyHttpClient(
         {

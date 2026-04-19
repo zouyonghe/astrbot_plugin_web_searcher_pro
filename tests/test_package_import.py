@@ -169,6 +169,22 @@ def test_llm_tools_keep_parameter_docstrings(monkeypatch):
         )
 
 
+def test_command_handlers_keep_docstrings_for_router_metadata(monkeypatch):
+    module = _import_plugin_main(monkeypatch)
+    expected_phrases = {
+        "websearch": "Only use this command when the user explicitly wants to enable or disable web search.",
+        "search_aur": "Only use this command when the user explicitly asks for an Arch Linux or AUR package.",
+        "github_search": "Only use this command when the user explicitly asks to run the /github command.",
+    }
+
+    for method_name, expected_phrase in expected_phrases.items():
+        method = getattr(module.WebSearcherPro, method_name)
+        docstring = method.__doc__
+
+        assert docstring, f"{method_name} should keep a docstring for command routing metadata"
+        assert expected_phrase in docstring
+
+
 class DummyProviderConfig(dict):
     def __init__(self):
         super().__init__(provider_settings={"web_search": False})
@@ -227,6 +243,41 @@ def test_set_websearch_status_toggles_all_websearch_tools(monkeypatch):
     assert plugin.context.config["provider_settings"]["web_search"] is False
     assert set(plugin.context.deactivated_tools) == expected_tools
     assert len(plugin.context.deactivated_tools) == len(expected_tools)
+
+
+def test_apply_startup_websearch_default_enables_tools_when_configured(monkeypatch):
+    module = _import_plugin_main(monkeypatch)
+    plugin = object.__new__(module.WebSearcherPro)
+    plugin.context = DummyContext()
+    plugin.plugin_config = types.SimpleNamespace(default_web_search_enabled=True)
+    calls = []
+
+    def fake_set_websearch_status(status: bool):
+        calls.append(status)
+
+    monkeypatch.setattr(plugin, "_set_websearch_status", fake_set_websearch_status, raising=False)
+
+    plugin._apply_startup_websearch_default()
+
+    assert calls == [True]
+
+
+def test_apply_startup_websearch_default_keeps_existing_status(monkeypatch):
+    module = _import_plugin_main(monkeypatch)
+    plugin = object.__new__(module.WebSearcherPro)
+    plugin.context = DummyContext()
+    plugin.context.config["provider_settings"]["web_search"] = True
+    plugin.plugin_config = types.SimpleNamespace(default_web_search_enabled=True)
+    calls = []
+
+    def fake_set_websearch_status(status: bool):
+        calls.append(status)
+
+    monkeypatch.setattr(plugin, "_set_websearch_status", fake_set_websearch_status, raising=False)
+
+    plugin._apply_startup_websearch_default()
+
+    assert calls == []
 
 
 def test_new_text_search_tools_forward_category_and_empty_message(monkeypatch):

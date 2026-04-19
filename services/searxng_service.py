@@ -36,6 +36,8 @@ def filter_results(
     *,
     ranking_profile: str = "default",
 ) -> SearchResult:
+    if result.error_message:
+        return result
     items = list(result.results)
     if engines:
         items = [item for item in items if item.engine in engines]
@@ -63,6 +65,8 @@ class SearxngService:
             limit=max(limit, self.image_candidate_limit),
             lang="zh",
         )
+        if result.error_message:
+            return result
         if result.is_empty:
             return SearchResult()
         return await self._filter_image_results(result, engines=engines, limit=limit)
@@ -79,6 +83,10 @@ class SearxngService:
             status, data = await self.http_client.get_json(f"{self.base_url}/search", params=params)
         except (ExternalServiceError, TypeError, ValueError):
             return SearchResult()
+        if status == 403:
+            return SearchResult(
+                error_message="SearXNG returned 403 Forbidden. Please check whether the /search JSON interface is enabled and reachable."
+            )
         if status != 200 or not isinstance(data, dict):
             return SearchResult()
         raw_results = data.get("results", [])
@@ -108,6 +116,8 @@ class SearxngService:
                 limit=limit,
                 lang=requested_language,
             )
+            if result.error_message:
+                return result
             filtered = filter_results(
                 result,
                 category=category,

@@ -13,3 +13,10 @@ def test_plugin_config_reads_defaults():
     assert config.enable_random_image is False
     assert config.enable_image_title is True
     assert config.github_token == ""
+    assert config.default_web_search_enabled is False
+
+
+def test_plugin_config_reads_default_web_search_toggle():
+    config = PluginConfig.from_mapping(DummyConfig(default_web_search_enabled=True))
+
+    assert config.default_web_search_enabled is True

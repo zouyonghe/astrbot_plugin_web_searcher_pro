@@ -30,6 +30,7 @@ class SearchResultItem:
 @dataclass(slots=True)
 class SearchResult:
     results: List[SearchResultItem] = field(default_factory=list)
+    error_message: str = ""
 
     def __iter__(self):
         return iter(self.results)
@@ -42,13 +43,15 @@ class SearchResult:
         return not self.results
 
     def limited(self, limit: int) -> "SearchResult":
-        return SearchResult(results=list(self.results[:limit]))
+        return SearchResult(results=list(self.results[:limit]), error_message=self.error_message)
 
     @classmethod
     def from_iterable(cls, items: Iterable[Mapping[str, Any]]) -> "SearchResult":
         return cls(results=[SearchResultItem.from_mapping(item) for item in items])
 
     def __str__(self) -> str:
+        if self.error_message and not self.results:
+            return self.error_message
         if not self.results:
             return "No results."
 

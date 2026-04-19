@@ -44,12 +44,13 @@
 - `enable_image_title`：图片结果是否附带标题
 - `image_result_limit`：图片搜索最终返回数量上限
 - `image_candidate_limit`：图片搜索预筛选候选数量
+- `default_web_search_enabled`：插件启动时自动开启网页搜索能力
 - `github_token`：提高 GitHub API 配额
 
 ## 使用方法
 
 1. 安装插件并配置 `searxng_api_url`。
-2. 使用 `/websearch on` 开启网页搜索工具。
+2. 使用 `/websearch on` 开启网页搜索工具，或在配置中打开 `default_web_search_enabled` 让插件启动时自动开启。
 3. 通过命令或自然语言触发对应能力。
 
 ## 指令列表
@@ -92,6 +93,21 @@
 1. GitHub、网页抓取、AUR 等能力依赖外部服务，建议配置合理超时与代理。
 2. 图片搜索会先做可访问性校验，再按分辨率和搜索得分排序。
 3. 若启用 `enable_random_image`，图片模式只返回一张结果。
+4. `searxng_web_fetch_url` 对客户端渲染页面会回退为标题和元信息；如果站点内容完全依赖浏览器执行 JavaScript，仍建议搭配带渲染能力的抓取工具。
+
+## 故障排查
+
+### 1. SearXNG 返回 403
+
+- 先直接测试 JSON 接口：`curl "http://127.0.0.1:8080/search?q=test&categories=general&format=json"`
+- 如果浏览器能打开首页，但 `format=json` 返回 403，通常是 SearXNG 部署或反代配置问题，不是插件解析问题。
+- 检查 `searxng_api_url` 是否和实际协议、端口一致，尤其注意 Caddy/Nginx 强制 HTTPS 跳转、容器端口映射、以及 `search` 路径是否允许匿名访问 JSON。
+
+### 2. 自然语言被误判成 `/aur`
+
+- 如果你启用了 `astrbot_plugin_command_router` 这类自然语言指令路由插件，它会同时参考插件描述和命令描述做匹配。
+- 当前版本已经给 `/websearch`、`/aur`、`/github` 增加了更明确的命令说明，降低把普通资料检索误判成 AUR 包查询的概率。
+- 普通联网搜索优先让 LLM 使用 `searxng_web_search_*` 和 `searxng_web_fetch_url` 这些工具，不建议把 `/aur` 当成自然语言搜索入口。
 
 ## 问题反馈
 

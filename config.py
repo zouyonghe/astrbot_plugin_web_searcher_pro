@@ -7,6 +7,7 @@ DEFAULT_SEARXNG_API_URL = "http://127.0.0.1:8080"
 DEFAULT_REQUEST_TIMEOUT = 15
 DEFAULT_IMAGE_RESULT_LIMIT = 12
 DEFAULT_IMAGE_CANDIDATE_LIMIT = 120
+DEFAULT_WEB_SEARCH_ENABLED = False
 
 
 @dataclass(frozen=True)
@@ -18,6 +19,7 @@ class PluginConfig:
     request_timeout: int = DEFAULT_REQUEST_TIMEOUT
     image_result_limit: int = DEFAULT_IMAGE_RESULT_LIMIT
     image_candidate_limit: int = DEFAULT_IMAGE_CANDIDATE_LIMIT
+    default_web_search_enabled: bool = DEFAULT_WEB_SEARCH_ENABLED
     proxy: str | None = None
 
     @classmethod
@@ -32,6 +34,9 @@ class PluginConfig:
             image_candidate_limit=max(
                 10,
                 int(mapping.get("image_candidate_limit", DEFAULT_IMAGE_CANDIDATE_LIMIT)),
+            ),
+            default_web_search_enabled=bool(
+                mapping.get("default_web_search_enabled", DEFAULT_WEB_SEARCH_ENABLED)
             ),
             proxy=os.environ.get("https_proxy") or os.environ.get("http_proxy"),
         )

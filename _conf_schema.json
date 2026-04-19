@@ -34,6 +34,12 @@
         "default": 120,
         "hint": "候选越大筛选更充分，但也会增加请求开销"
     },
+    "default_web_search_enabled": {
+        "type": "bool",
+        "description": "启动时默认开启网页搜索",
+        "default": false,
+        "hint": "开启后插件加载时会自动启用网页搜索工具，避免每次手动执行 /websearch on"
+    },
     "github_token": {
         "type": "string",
         "description": "GitHub token",

@@ -5,7 +5,9 @@ from ..search_models import SearchResult
 
 
 def format_search_result(result: SearchResult | None, empty_message: str) -> str:
-    if not result or result.is_empty:
+    if result is not None and result.error_message:
+        return result.error_message
+    if result is None or result.is_empty:
         return empty_message
     return str(result)
 
