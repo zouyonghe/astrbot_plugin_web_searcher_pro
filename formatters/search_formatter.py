@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Iterable, Mapping
 
-from ..search_models import SearchResult
+from ..search_models import SearchResult, SearchResultItem
 
 
 def format_search_result(result: SearchResult | None, empty_message: str) -> str:
@@ -10,6 +10,22 @@ def format_search_result(result: SearchResult | None, empty_message: str) -> str
     if result is None or result.is_empty:
         return empty_message
     return str(result)
+
+
+def format_image_results(items: Iterable[SearchResultItem]) -> str:
+    formatted = []
+    for idx, item in enumerate(items, 1):
+        details = [f"{idx}. {item.title or 'Untitled'}"]
+        if item.url:
+            details.append(f"Page: {item.url}")
+        if item.img_src:
+            details.append(f"Image: {item.img_src}")
+        if item.resolution:
+            details.append(f"Resolution: {item.resolution}")
+        if item.content:
+            details.append(f"Content: {item.content}")
+        formatted.append("\n".join(details))
+    return "\n\n".join(formatted)
 
 
 def format_aur_exact_result(package: Mapping[str, object]) -> str:

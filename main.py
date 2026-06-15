@@ -6,9 +6,10 @@ from astrbot.api.event import AstrMessageEvent
 from astrbot.api.event.filter import *
 from astrbot.api.star import Context, Star, register
 from astrbot.core.message.components import Image, Node, Nodes, Plain
+from astrbot.core.message.message_event_result import MessageChain
 
 from .config import PluginConfig
-from .formatters.search_formatter import format_search_result
+from .formatters.search_formatter import format_image_results, format_search_result
 from .services.aur_service import AurService
 from .services.github_service import GitHubService
 from .services.http_client import HttpClient
@@ -61,7 +62,7 @@ WEBSEARCH_TOOL_NAMES = (
 )
 
 
-@register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.1.4",
+@register("web_searcher_pro", "buding", "更高性能的Web检索插件", "1.1.5",
           "https://github.com/zouyonghe/astrbot_plugin_web_searcher_pro")
 class WebSearcherPro(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -128,6 +129,26 @@ class WebSearcherPro(Star):
             content=content,
         )
 
+    async def _send_image_results_to_user(self, event: AstrMessageEvent, results) -> None:
+        if self.plugin_config.enable_random_image:
+            selected = random.choice(results)
+            if not self.plugin_config.enable_image_title:
+                await event.send(MessageChain([Image.fromURL(selected.img_src)]))
+                return
+            base64_image = await self.image_service.download_base64(selected.img_src)
+            if not base64_image:
+                await event.send(MessageChain([Plain(IMAGE_DOWNLOAD_FAILED)]))
+                return
+            await event.send(MessageChain([Image.fromBase64(base64_image), Plain(selected.title)]))
+            return
+
+        nodes = await asyncio.gather(*(self._build_image_node(event, item) for item in results))
+        valid_nodes = [node for node in nodes if node]
+        if not valid_nodes:
+            await event.send(MessageChain([Plain(IMAGE_DOWNLOAD_FAILED)]))
+            return
+        await event.send(MessageChain([Nodes(valid_nodes)]))
+
     @command("websearch")
     async def websearch(self, event: AstrMessageEvent, operation: str = None):
         """Only use this command when the user explicitly wants to enable or disable web search.
@@ -171,7 +192,7 @@ class WebSearcherPro(Star):
         return await self._search_text_category(query, category="general", empty_message=GENERAL_EMPTY_MESSAGE)
 
     @llm_tool(IMAGES_TOOL_NAME)
-    async def search_images(self, event: AstrMessageEvent, query: str):
+    async def search_images(self, event: AstrMessageEvent, query: str) -> str:
         """Search the web for images.
 
         Use this tool when the user wants existing images about a topic.
@@ -187,30 +208,13 @@ class WebSearcherPro(Star):
             engines=["google images", "bing images"],
         )
         if result.error_message:
-            yield event.plain_result(result.error_message)
-            return
+            return result.error_message
         if result.is_empty:
-            yield event.plain_result(IMAGE_EMPTY_MESSAGE)
-            return
+            return IMAGE_EMPTY_MESSAGE
 
-        if self.plugin_config.enable_random_image:
-            selected = random.choice(result.results)
-            if not self.plugin_config.enable_image_title:
-                yield event.image_result(selected.img_src)
-                return
-            base64_image = await self.image_service.download_base64(selected.img_src)
-            if not base64_image:
-                yield event.plain_result(IMAGE_DOWNLOAD_FAILED)
-                return
-            yield event.chain_result([Image.fromBase64(base64_image), Plain(selected.title)])
-            return
-
-        nodes = await asyncio.gather(*(self._build_image_node(event, item) for item in result.results))
-        valid_nodes = [node for node in nodes if node]
-        if not valid_nodes:
-            yield event.plain_result(IMAGE_DOWNLOAD_FAILED)
-            return
-        yield event.chain_result([Nodes(valid_nodes)])
+        if self.plugin_config.image_delivery_mode in {"user", "both"}:
+            await self._send_image_results_to_user(event, result.results)
+        return format_image_results(result.results)
 
     @llm_tool(VIDEOS_TOOL_NAME)
     async def search_videos(self, event: AstrMessageEvent, query: str):

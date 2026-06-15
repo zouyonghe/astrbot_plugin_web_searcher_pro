@@ -35,6 +35,7 @@ def _import_plugin_main(monkeypatch):
         "astrbot.core",
         "astrbot.core.message",
         "astrbot.core.message.components",
+        "astrbot.core.message.message_event_result",
         "aiohttp",
         "bs4",
         "PIL",
@@ -50,6 +51,7 @@ def _import_plugin_main(monkeypatch):
     core = _stub_module(monkeypatch, "astrbot.core")
     core_message = _stub_module(monkeypatch, "astrbot.core.message")
     components = _stub_module(monkeypatch, "astrbot.core.message.components")
+    message_event_result = _stub_module(monkeypatch, "astrbot.core.message.message_event_result")
     aiohttp = _stub_module(monkeypatch, "aiohttp")
     bs4 = _stub_module(monkeypatch, "bs4")
     pil = _stub_module(monkeypatch, "PIL")
@@ -116,11 +118,19 @@ def _import_plugin_main(monkeypatch):
     event.__dict__.update(AstrMessageEvent=type("AstrMessageEvent", (), {}))
     star.__dict__.update(Context=DummyContext, Star=DummyStar, register=register)
     components.__dict__.update(
-        Image=type("Image", (), {"fromBase64": staticmethod(lambda value: value)}),
+        Image=type(
+            "Image",
+            (),
+            {
+                "fromBase64": staticmethod(lambda value: value),
+                "fromURL": staticmethod(lambda value: value),
+            },
+        ),
         Node=type("Node", (), {}),
         Nodes=type("Nodes", (), {}),
         Plain=type("Plain", (), {}),
     )
+    message_event_result.__dict__.update(MessageChain=list)
     aiohttp.__dict__.update(
         ClientError=DummyClientError,
         ClientTimeout=DummyClientTimeout,
@@ -303,3 +313,44 @@ def test_new_text_search_tools_forward_category_and_empty_message(monkeypatch):
 
         assert result == f"forwarded:{expected_category}"
         assert calls == [("test query", expected_category, expected_empty_message, 5)]
+
+
+def test_search_images_returns_model_text_without_yielding(monkeypatch):
+    module = _import_plugin_main(monkeypatch)
+    plugin = object.__new__(module.WebSearcherPro)
+    plugin.plugin_config = types.SimpleNamespace(
+        image_result_limit=2,
+        image_delivery_mode="model",
+        enable_random_image=False,
+        enable_image_title=True,
+    )
+    plugin.searxng_service = types.SimpleNamespace()
+    plugin.image_service = types.SimpleNamespace()
+    sent_messages = []
+
+    class DummyEvent:
+        async def send(self, message):
+            sent_messages.append(message)
+
+    async def fake_search(*args, **kwargs):
+        return module.SearchResult.from_iterable(
+            [
+                {
+                    "title": "Apple image",
+                    "url": "https://example.com/page",
+                    "img_src": "https://example.com/apple.jpg",
+                    "resolution": "800x600",
+                    "content": "Apple picture",
+                    "engine": "demo",
+                    "score": 1.0,
+                }
+            ]
+        )
+
+    plugin.searxng_service.search = fake_search
+
+    result = asyncio.run(module.WebSearcherPro.search_images(plugin, DummyEvent(), "苹果"))
+
+    assert "Apple image" in result
+    assert "Image: https://example.com/apple.jpg" in result
+    assert sent_messages == []

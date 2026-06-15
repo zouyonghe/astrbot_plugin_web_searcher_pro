@@ -14,9 +14,22 @@ def test_plugin_config_reads_defaults():
     assert config.enable_image_title is True
     assert config.github_token == ""
     assert config.default_web_search_enabled is False
+    assert config.image_delivery_mode == "model"
 
 
 def test_plugin_config_reads_default_web_search_toggle():
     config = PluginConfig.from_mapping(DummyConfig(default_web_search_enabled=True))
 
     assert config.default_web_search_enabled is True
+
+
+def test_plugin_config_reads_image_delivery_mode():
+    config = PluginConfig.from_mapping(DummyConfig(image_delivery_mode="user"))
+
+    assert config.image_delivery_mode == "user"
+
+
+def test_plugin_config_rejects_invalid_image_delivery_mode():
+    config = PluginConfig.from_mapping(DummyConfig(image_delivery_mode="invalid"))
+
+    assert config.image_delivery_mode == "model"

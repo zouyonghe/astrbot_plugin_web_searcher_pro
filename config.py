@@ -8,6 +8,8 @@ DEFAULT_REQUEST_TIMEOUT = 15
 DEFAULT_IMAGE_RESULT_LIMIT = 12
 DEFAULT_IMAGE_CANDIDATE_LIMIT = 120
 DEFAULT_WEB_SEARCH_ENABLED = False
+DEFAULT_IMAGE_DELIVERY_MODE = "model"
+IMAGE_DELIVERY_MODES = {"model", "user", "both"}
 
 
 @dataclass(frozen=True)
@@ -20,10 +22,15 @@ class PluginConfig:
     image_result_limit: int = DEFAULT_IMAGE_RESULT_LIMIT
     image_candidate_limit: int = DEFAULT_IMAGE_CANDIDATE_LIMIT
     default_web_search_enabled: bool = DEFAULT_WEB_SEARCH_ENABLED
+    image_delivery_mode: str = DEFAULT_IMAGE_DELIVERY_MODE
     proxy: str | None = None
 
     @classmethod
     def from_mapping(cls, mapping: Mapping[str, Any]) -> "PluginConfig":
+        image_delivery_mode = str(mapping.get("image_delivery_mode", DEFAULT_IMAGE_DELIVERY_MODE)).strip().lower()
+        if image_delivery_mode not in IMAGE_DELIVERY_MODES:
+            image_delivery_mode = DEFAULT_IMAGE_DELIVERY_MODE
+
         return cls(
             searxng_api_url=str(mapping.get("searxng_api_url", DEFAULT_SEARXNG_API_URL)).rstrip("/"),
             enable_random_image=bool(mapping.get("enable_random_image", False)),
@@ -38,6 +45,7 @@ class PluginConfig:
             default_web_search_enabled=bool(
                 mapping.get("default_web_search_enabled", DEFAULT_WEB_SEARCH_ENABLED)
             ),
+            image_delivery_mode=image_delivery_mode,
             proxy=os.environ.get("https_proxy") or os.environ.get("http_proxy"),
         )
 

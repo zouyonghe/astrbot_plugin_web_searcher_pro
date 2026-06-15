@@ -40,6 +40,12 @@
         "default": false,
         "hint": "开启后插件加载时会自动启用网页搜索工具，避免每次手动执行 /websearch on"
     },
+    "image_delivery_mode": {
+        "type": "string",
+        "description": "图片搜索结果发送模式",
+        "default": "model",
+        "hint": "model=只返回图片链接和摘要给模型；user=发送图片给用户并返回摘要给模型；both=同 user，保留给兼容明确双通道语义"
+    },
     "github_token": {
         "type": "string",
         "description": "GitHub token",

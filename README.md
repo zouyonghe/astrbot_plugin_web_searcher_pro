@@ -44,6 +44,7 @@
 - `enable_image_title`：图片结果是否附带标题
 - `image_result_limit`：图片搜索最终返回数量上限
 - `image_candidate_limit`：图片搜索预筛选候选数量
+- `image_delivery_mode`：图片搜索结果发送模式，`model` 只返回图片链接和摘要给模型，`user`/`both` 会同时直接发送图片给用户
 - `default_web_search_enabled`：插件启动时自动开启网页搜索能力
 - `github_token`：提高 GitHub API 配额
 
